@@ -1,10 +1,18 @@
 # FlightCode Configurator
 
-1. Compilare e caricare `C:\SvilST\FlightCode\build\debug\FlightCode-MAMBAF411.hex` tramite DFU.
-2. Riavviare la flight controller normalmente, senza tenere premuto BOOT.
-3. Avviare `start-configurator.cmd`.
-4. In Chrome o Edge premere **Connetti** e scegliere `FlightCode USB Configurator`.
+Shared Web Serial configurator for FlightCode firmware on STM32F4 and
+FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
+available features and adapts the interface to the connected board.
 
-Il configuratore mostra telemetria IMU, 16 canali SBUS, motori e consente di
-leggere, applicare e salvare i PID. Per sicurezza i comandi che modificano o
-salvano i PID vengono rifiutati quando il firmware è armato.
+FlightCodePI exposes every configurator feature: PID settings, rates/expo,
+feedforward, TPA, alignment, motor protocol and idle, calibration, protected
+PID diagnostics, flight logs, and USB BOOTSEL mode.
+
+1. Build and flash the appropriate FlightCode or FlightCodePI firmware.
+2. Restart the flight controller normally without holding BOOT.
+3. Launch `start-configurator.cmd`.
+4. In Chrome or Edge, select **Connect** and choose the FlightCode device.
+
+The configurator displays IMU telemetry, 16 SBUS channels, and motor outputs.
+It can read, apply, and persist all supported flight settings. For safety, the
+firmware rejects configuration changes while the flight controller is armed.

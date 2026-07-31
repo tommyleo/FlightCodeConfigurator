@@ -1,42 +1,42 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
 const channelNames=["Throttle","Roll","Pitch","Yaw","Buzzer","Arm"];
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0}};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set()};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
-  {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Appoggia il quad fermo e perfettamente in piano"},
-  {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Porta lentamente il ROLL a +90° (fianco destro in basso) e mantieni"},
-  {key:"roll_p180",axis:"roll",target:[180,0,0],ms:4000,text:"Continua il ROLL fino a +180° (quad capovolto) e mantieni"},
-  {key:"roll_zero_1",axis:"roll",target:[0,0,0],ms:4000,text:"Riporta il quad in piano seguendo lo stesso asse ROLL"},
-  {key:"roll_n90",axis:"roll",target:[-90,0,0],ms:4000,text:"Porta il ROLL a -90° (fianco sinistro in basso) e mantieni"},
-  {key:"roll_n180",axis:"roll",target:[-180,0,0],ms:4000,text:"Continua il ROLL fino a -180° (quad capovolto) e mantieni"},
-  {key:"roll_zero_2",axis:"roll",target:[0,0,0],ms:4000,text:"Riporta nuovamente il quad in piano"},
-  {key:"pitch_p90",axis:"pitch",target:[0,90,0],ms:4000,text:"Alza il muso fino a PITCH +90° e mantieni"},
-  {key:"pitch_p180",axis:"pitch",target:[0,180,0],ms:4000,text:"Continua fino a PITCH +180° (capovolto) e mantieni"},
-  {key:"pitch_zero_1",axis:"pitch",target:[0,0,0],ms:4000,text:"Riporta il quad in piano lungo il PITCH"},
-  {key:"pitch_n90",axis:"pitch",target:[0,-90,0],ms:4000,text:"Abbassa il muso fino a PITCH -90° e mantieni"},
-  {key:"pitch_n180",axis:"pitch",target:[0,-180,0],ms:4000,text:"Continua fino a PITCH -180° (capovolto) e mantieni"},
-  {key:"pitch_zero_2",axis:"pitch",target:[0,0,0],ms:4000,text:"Riporta nuovamente il quad in piano"},
-  {key:"yaw_p90",axis:"yaw",target:[0,0,90],ms:4000,text:"Ruota il muso a destra fino a YAW +90° e mantieni"},
-  {key:"yaw_p180",axis:"yaw",target:[0,0,180],ms:4000,text:"Continua verso destra fino a YAW +180° e mantieni"},
-  {key:"yaw_zero_1",axis:"yaw",target:[0,0,0],ms:4000,text:"Riporta lo YAW alla direzione iniziale"},
-  {key:"yaw_n90",axis:"yaw",target:[0,0,-90],ms:4000,text:"Ruota il muso a sinistra fino a YAW -90° e mantieni"},
-  {key:"yaw_n180",axis:"yaw",target:[0,0,-180],ms:4000,text:"Continua verso sinistra fino a YAW -180° e mantieni"},
-  {key:"yaw_zero_2",axis:"yaw",target:[0,0,0],ms:4000,text:"Riporta lo YAW alla direzione iniziale"},
+  {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
+  {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
+  {key:"roll_p180",axis:"roll",target:[180,0,0],ms:4000,text:"Continue rolling to +180° (quad upside down) and hold"},
+  {key:"roll_zero_1",axis:"roll",target:[0,0,0],ms:4000,text:"Return the quad to level along the same roll axis"},
+  {key:"roll_n90",axis:"roll",target:[-90,0,0],ms:4000,text:"Roll to -90° (left side down) and hold"},
+  {key:"roll_n180",axis:"roll",target:[-180,0,0],ms:4000,text:"Continue rolling to -180° (quad upside down) and hold"},
+  {key:"roll_zero_2",axis:"roll",target:[0,0,0],ms:4000,text:"Return the quad to level again"},
+  {key:"pitch_p90",axis:"pitch",target:[0,90,0],ms:4000,text:"Raise the nose to pitch +90° and hold"},
+  {key:"pitch_p180",axis:"pitch",target:[0,180,0],ms:4000,text:"Continue to pitch +180° (upside down) and hold"},
+  {key:"pitch_zero_1",axis:"pitch",target:[0,0,0],ms:4000,text:"Return the quad to level along the pitch axis"},
+  {key:"pitch_n90",axis:"pitch",target:[0,-90,0],ms:4000,text:"Lower the nose to pitch -90° and hold"},
+  {key:"pitch_n180",axis:"pitch",target:[0,-180,0],ms:4000,text:"Continue to pitch -180° (upside down) and hold"},
+  {key:"pitch_zero_2",axis:"pitch",target:[0,0,0],ms:4000,text:"Return the quad to level again"},
+  {key:"yaw_p90",axis:"yaw",target:[0,0,90],ms:4000,text:"Rotate the nose right to yaw +90° and hold"},
+  {key:"yaw_p180",axis:"yaw",target:[0,0,180],ms:4000,text:"Continue right to yaw +180° and hold"},
+  {key:"yaw_zero_1",axis:"yaw",target:[0,0,0],ms:4000,text:"Return yaw to the starting direction"},
+  {key:"yaw_n90",axis:"yaw",target:[0,0,-90],ms:4000,text:"Rotate the nose left to yaw -90° and hold"},
+  {key:"yaw_n180",axis:"yaw",target:[0,0,-180],ms:4000,text:"Continue left to yaw -180° and hold"},
+  {key:"yaw_zero_2",axis:"yaw",target:[0,0,0],ms:4000,text:"Return yaw to the starting direction"},
   {key:"combined",axis:"combined",target:null,ms:5000,text:"Prova una posizione combinata libera su roll, pitch e yaw; non servono angoli precisi"},
-  {key:"plane_end",axis:"still",target:[0,0,0],ms:3000,text:"Termina riportando il quad fermo e in piano"}
+  {key:"plane_end",axis:"still",target:[0,0,0],ms:3000,text:"Finish with the quad still and level"}
 ]};
 const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,timer:null,aborted:false,abortMessage:"",detected:false,neutralSince:0,stages:[
-  {key:"stabile",ms:2000,text:"Tieni il quad fermo con throttle a zero"},
-  {key:"feedbackRoll",ms:4000,text:"Stick centrati: inclina a mano il quad a destra e sinistra"},
-  {key:"feedbackPitch",ms:4000,text:"Stick centrati: alza e abbassa a mano il muso"},
-  {key:"feedbackYaw",ms:4000,text:"Stick centrati: ruota a mano il muso a destra e sinistra"},
-  {key:"throttle50",ms:4000,text:"Porta il THROTTLE circa al 50%, poi riportalo a zero"},
-  {key:"commandRoll",ms:4000,text:"Porta ROLL verso destra (CH2 alto), poi ricentra"},
-  {key:"commandPitch",ms:4000,text:"Porta PITCH verso CH3 alto, poi ricentra"},
-  {key:"commandYaw",ms:4000,text:"Porta YAW verso destra (CH4 alto), poi ricentra"}
+  {key:"stabile",ms:2000,text:"Keep the quad still with throttle at zero"},
+  {key:"feedbackRoll",ms:4000,text:"Sticks centered: manually tilt the quad right and left"},
+  {key:"feedbackPitch",ms:4000,text:"Sticks centered: manually raise and lower the nose"},
+  {key:"feedbackYaw",ms:4000,text:"Sticks centered: manually rotate the nose right and left"},
+  {key:"throttle50",ms:4000,text:"Raise throttle to about 50%, then return it to zero"},
+  {key:"commandRoll",ms:4000,text:"Move roll right (CH2 high), then center the stick"},
+  {key:"commandPitch",ms:4000,text:"Move pitch toward CH3 high, then center the stick"},
+  {key:"commandYaw",ms:4000,text:"Move yaw right (CH4 high), then center the stick"}
 ]};
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null};
 const tuningProfiles={
-  balanced:{label:"BILANCIATO",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],expo:.35,ff:[.025,.025,.015],tpa:[0,65]},
+  balanced:{label:"BALANCED",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],expo:.35,ff:[.025,.025,.015],tpa:[0,65]},
   racing:{label:"RACING",pids:[.10,.2,.0012,.10,.2,.0012,.13,.2,0],expo:.15,ff:[.032,.032,.020],tpa:[20,65]},
   freestyle:{label:"FREESTYLE",pids:[.09,.22,.0014,.09,.22,.0014,.12,.22,0],expo:.35,ff:[.025,.025,.015],tpa:[0,65]}
 };
@@ -71,11 +71,48 @@ function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.to
 document.querySelectorAll(".nav").forEach(v=>v.onclick=()=>view(v.dataset.view));
 function badge(el,text,type=""){el.textContent=text;el.className=`badge ${type}`}
 function saveState(text,type=""){const el=$("#saveState");el.textContent=text;el.className=`save-state ${type}`}
-function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||state.armed||state.motorTest}
+function hasCapability(name){return state.capabilities.has(name)}
+function setCapabilityControls(selector,name){
+  document.querySelectorAll(selector).forEach(element=>{
+    element.disabled=!state.connected||!hasCapability(name);
+    element.title=hasCapability(name)?"":"Feature not available on this board";
+  });
+}
+function updateMotorProtocolOptions(){
+  const values=state.board==="PICO2_W"
+    ?[["DSHOT150","DSHOT150"],["DSHOT300","DSHOT300"],["DSHOT600","DSHOT600"]]
+    :[["DSHOT300","DSHOT300"],["MULTISHOT","MultiShot · 5–25 µs"],["ONESHOT125","OneShot125 · 125–250 µs"]];
+  const selected=$("#motorProtocol").value;
+  $("#motorProtocol").innerHTML=values.map(([value,label])=>`<option value="${value}">${label}</option>`).join("");
+  if(values.some(([value])=>value===selected))$("#motorProtocol").value=selected;
+}
+function applyCapabilities(){
+  setCapabilityControls("[data-pid]","PIDS");
+  setCapabilityControls("[data-rate]","RATES");
+  setCapabilityControls("[data-feedforward]","FEEDFORWARD");
+  setCapabilityControls("[data-tpa]","TPA");
+  setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
+  setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
+  setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
+  setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
+  setCapabilityControls("#motorSafetyCheck","MOTOR_TEST");
+  setCapabilityControls("#startImuDiagnosticButton","TELEMETRY");
+  setCapabilityControls("#calibrateGyroButton","GYRO_CALIBRATION");
+  setCapabilityControls("#pidDiagnosticSafety","PID_SIM");
+  setCapabilityControls("#refreshFlightLogButton","FLIGHT_LOG");
+  setCapabilityControls("#enterDfuButton","DFU");
+  document.querySelectorAll("[data-tuning-profile]").forEach(element=>{
+    element.disabled=!state.connected||!["PIDS","RATES","FEEDFORWARD","TPA"].every(hasCapability);
+  });
+  [buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(element=>element.disabled=!state.connected||!hasCapability("PIDS"));
+  $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
+  updateDfuButton();
+}
+function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
 function connected(value){
   state.connected=value;$("#connectionDot").classList.toggle("online",value);$("#deviceDot").classList.toggle("online",value);
-  $("#connectionText").textContent=value?"FlightCode collegata":"Scheda non collegata";buttons.connect.textContent=value?"Disconnetti":"Connetti";
+  $("#connectionText").textContent=value?"FlightCode connected":"Board not connected";buttons.connect.textContent=value?"Disconnect":"Connect";
   document.querySelectorAll("[data-pid]").forEach(i=>i.disabled=!value);[buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(b=>b.disabled=!value);
   document.querySelectorAll("[data-rate]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-feedforward]").forEach(i=>i.disabled=!value);
@@ -93,15 +130,16 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){$("#deviceName").textContent="Nessun dispositivo";$("#protocolText").textContent="USB seriale";badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Non collegato")}
+  if(!value){$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
-  if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Verifica interrotta: scheda scollegata.");
-  if(!value&&pidDiagnostic.running)cancelPidDiagnostic("Verifica interrotta: scheda scollegata.");
+  if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
+  if(!value&&pidDiagnostic.running)cancelPidDiagnostic("Check interrupted: board disconnected.");
+  applyCapabilities();
 }
 function log(line,direction="RX"){
   if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line==="PING")return;
   const out=$("#consoleOutput");if(!state.count)out.textContent="";out.textContent+=`${new Date().toLocaleTimeString()}  ${direction}  ${line}\n`;out.scrollTop=out.scrollHeight;
-  $("#messageCount").textContent=`${++state.count} messaggi`;
+  $("#messageCount").textContent=`${++state.count} messages`;
 }
 async function send(command,visible=true){if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
 function resetAttitude(){
@@ -193,7 +231,7 @@ function diagnosticUi(instruction,result,type="",progress=0){
   const out=$("#imuDiagnosticResult");out.textContent=result;out.className=`diagnostic-result ${type}`;
   $("#imuDiagnosticProgress").style.width=`${Math.max(0,Math.min(100,progress))}%`;
 }
-function cancelImuDiagnostic(message="Verifica annullata."){
+function cancelImuDiagnostic(message="Check cancelled."){
   clearInterval(imuDiagnostic.timer);imuDiagnostic.timer=null;imuDiagnostic.running=false;
   $("#startImuDiagnosticButton").disabled=!state.connected;$("#cancelImuDiagnosticButton").disabled=true;
   diagnosticUi("Registra posizioni guidate fino a ±180° e crea un file completo dell’orientamento 3D.",message,"warn",0);
@@ -229,8 +267,8 @@ function finishImuDiagnostic(){
   $("#startImuDiagnosticButton").disabled=!state.connected;$("#cancelImuDiagnosticButton").disabled=true;
   $("#downloadImuDiagnosticButton").disabled=false;
   const ok=summary.sensorActive&&summary.accelerometerPlausible&&Object.values(summary.axesResponsive).every(Boolean);
-  diagnosticUi("Verifica completata. Scarica il file e passalo a Codex.",
-    ok?"Tutti gli assi hanno risposto e la gravità è plausibile.":"Rilevata un’anomalia: il file contiene i dati necessari per individuarla.",
+  diagnosticUi("Check completed. Download the file and send it to Codex.",
+    ok?"All axes responded and gravity is plausible.":"An anomaly was detected: the file contains the data needed to identify it.",
     ok?"ok":"warn",100);
 }
 function advanceImuDiagnostic(){
@@ -239,7 +277,7 @@ function advanceImuDiagnostic(){
   imuDiagnostic.stageStarted=performance.now();
 }
 function startImuDiagnostic(){
-  if(!state.connected||state.armed||state.motorTest||pidDiagnostic.running){toast("Disarma il quad e termina gli altri test");return}
+  if(!state.connected||state.armed||state.motorTest||pidDiagnostic.running){toast("Disarm the quad and stop the other tests");return}
   resetAttitude();
   imuDiagnostic.running=true;imuDiagnostic.stage=0;imuDiagnostic.stageStarted=performance.now();imuDiagnostic.samples=[];imuDiagnostic.file=null;
   $("#startImuDiagnosticButton").disabled=true;$("#cancelImuDiagnosticButton").disabled=false;$("#downloadImuDiagnosticButton").disabled=true;
@@ -248,7 +286,7 @@ function startImuDiagnostic(){
     const stage=imuDiagnostic.stages[imuDiagnostic.stage],elapsed=performance.now()-imuDiagnostic.stageStarted;
     const totalBefore=imuDiagnostic.stages.slice(0,imuDiagnostic.stage).reduce((v,s)=>v+s.ms,0);
     const total=imuDiagnostic.stages.reduce((v,s)=>v+s.ms,0);
-    diagnosticUi(stage.text,`Fase ${imuDiagnostic.stage+1} di ${imuDiagnostic.stages.length} · ${Math.max(0,(stage.ms-elapsed)/1000).toFixed(1)} s`,"",100*(totalBefore+Math.min(elapsed,stage.ms))/total);
+    diagnosticUi(stage.text,`Stage ${imuDiagnostic.stage+1} of ${imuDiagnostic.stages.length} · ${Math.max(0,(stage.ms-elapsed)/1000).toFixed(1)} s`,"",100*(totalBefore+Math.min(elapsed,stage.ms))/total);
     if(elapsed>=stage.ms)advanceImuDiagnostic();
   },50);
 }
@@ -272,18 +310,18 @@ function pidDiagnosticUi(instruction,result,type="",progress=0){
   const out=$("#pidDiagnosticResult");out.textContent=result;out.className=`diagnostic-result ${type}`;
   $("#pidDiagnosticProgress").style.width=`${Math.max(0,Math.min(100,progress))}%`;
 }
-function cancelPidDiagnostic(message="Verifica PID annullata."){
+function cancelPidDiagnostic(message="PID check cancelled."){
   clearInterval(pidDiagnostic.timer);pidDiagnostic.timer=null;
   if(pidDiagnostic.running&&state.armed&&state.connected){
     pidDiagnostic.aborted=true;pidDiagnostic.abortMessage=message;pidDiagnostic.stage=pidDiagnostic.stages.length;
-    pidDiagnosticUi("Riporta throttle a zero e abbassa CH6.","Uscite fisiche ancora bloccate: disarma per terminare.","warn",100);
+    pidDiagnosticUi("Return throttle to zero and lower CH6.","Physical outputs are still locked: disarm to finish.","warn",100);
     return;
   }
   if(pidDiagnostic.running)send("PID_SIM_ENABLE 0",false);
   pidDiagnostic.running=false;
   $("#cancelPidDiagnosticButton").disabled=true;
   $("#startPidDiagnosticButton").disabled=!state.connected||!$("#pidDiagnosticSafety").checked;
-  pidDiagnosticUi("Controlla che il PID contrasti correttamente i movimenti sui tre assi.",message,"warn",0);
+  pidDiagnosticUi("Check that the PID correctly opposes movement on all three axes.",message,"warn",0);
 }
 function correlation(rows,axis,mix){
   if(rows.length<2)return 0;
@@ -324,28 +362,28 @@ function finishPidDiagnostic(){
   $("#cancelPidDiagnosticButton").disabled=true;$("#startPidDiagnosticButton").disabled=!state.connected||!$("#pidDiagnosticSafety").checked;
   $("#downloadPidDiagnosticButton").disabled=false;
   const ok=Object.values(expected).every(Boolean)&&maxSpread>1;
-  pidDiagnosticUi("Simulazione terminata: le uscite fisiche sono rimaste sempre a zero.",
-    ok?"Le tre reazioni PID hanno il segno atteso.":"Una o più reazioni richiedono verifica nel file.",
+  pidDiagnosticUi("Simulation completed: physical outputs remained at zero throughout.",
+    ok?"All three PID responses have the expected direction.":"One or more responses require inspection in the file.",
     ok?"ok":"warn",100);
 }
 async function startPidDiagnostic(){
   if(!state.connected||state.armed||state.motorTest||imuDiagnostic.running||!$("#pidDiagnosticSafety").checked){
-    toast("Disarma il quad, termina gli altri test e conferma la rimozione delle eliche");return;
+    toast("Disarm the quad, stop the other tests, and confirm that the propellers are removed");return;
   }
   await send("PID_SIM_ENABLE 1");
   pidDiagnostic.running=true;pidDiagnostic.stage=-1;pidDiagnostic.samples=[];pidDiagnostic.file=null;pidDiagnostic.aborted=false;pidDiagnostic.abortMessage="";pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;
   $("#startPidDiagnosticButton").disabled=true;$("#cancelPidDiagnosticButton").disabled=false;$("#downloadPidDiagnosticButton").disabled=true;
-  pidDiagnosticUi("Throttle a zero, poi arma con CH6.","In attesa dell’armamento…","",0);
+  pidDiagnosticUi("Set throttle to zero, then arm with CH6.","Waiting for arming…","",0);
 }
 function beginPidStage(index){
   pidDiagnostic.stage=index;pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.stageStarted=performance.now();
   if(index>=pidDiagnostic.stages.length){
-    pidDiagnosticUi("Riporta tutti gli stick al centro, throttle a zero e abbassa CH6.","In attesa del disarmo per chiudere la simulazione…","",100);
+    pidDiagnosticUi("Center all sticks, set throttle to zero, and lower CH6.","Waiting for disarm to end the simulation…","",100);
     return;
   }
   if(index>0)send("PID_SIM_RESET",false);
   pidDiagnosticUi(pidDiagnostic.stages[index].text,
-    `Fase ${index+1} di ${pidDiagnostic.stages.length} · in attesa del movimento`,"",
+    `Stage ${index+1} of ${pidDiagnostic.stages.length} · waiting for movement`,"",
     100*index/pidDiagnostic.stages.length);
 }
 function updatePidStage(gyro,channelValues){
@@ -364,8 +402,8 @@ function updatePidStage(gyro,channelValues){
     key==="throttle50"?channelValues[0]<1100:Math.abs(channelValues[commandChannel]-1500)<80;
   if(!pidDiagnostic.detected&&active){
     pidDiagnostic.detected=true;pidDiagnostic.neutralSince=0;
-    const back=axis>=0?"Ora riporta il quad fermo.":key==="throttle50"?"Ora riporta il throttle a zero.":"Ora ricentra lo stick.";
-    pidDiagnosticUi(back,`Fase ${pidDiagnostic.stage+1}: movimento rilevato`,"ok",
+    const back=axis>=0?"Now hold the quad still.":key==="throttle50"?"Now return throttle to zero.":"Now center the stick.";
+    pidDiagnosticUi(back,`Stage ${pidDiagnostic.stage+1}: movement detected`,"ok",
       100*(pidDiagnostic.stage+.55)/pidDiagnostic.stages.length);
   }
   if(pidDiagnostic.detected){
@@ -377,7 +415,7 @@ function updatePidStage(gyro,channelValues){
 }
 function recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,motorValues){
   if(!pidDiagnostic.running)return;
-  if(!signal){cancelPidDiagnostic("Ricevente persa: verifica interrotta.");return}
+  if(!signal){cancelPidDiagnostic("Receiver signal lost: check interrupted.");return}
   if(pidDiagnostic.stage<0){
     if(armed)beginPidStage(0);
     return;
@@ -390,7 +428,7 @@ function recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,mot
     }
     return;
   }
-  if(!armed){cancelPidDiagnostic("Quad disarmato prima della fine: verifica interrotta.");return}
+  if(!armed){cancelPidDiagnostic("Quad disarmed before completion: check interrupted.");return}
   pidDiagnostic.samples.push({stage:pidDiagnostic.stages[pidDiagnostic.stage].key,timestampUs:timestamp,gyro,accel,motors:motorValues,channels:channelValues.slice(0,6)});
   updatePidStage(gyro,channelValues);
 }
@@ -401,15 +439,15 @@ function downloadPidDiagnostic(){
 }
 function updateFlightLogUi(){
   const status=$("#flightLogStatus");
-  if(flightLog.recording)status.textContent="Registrazione in corso: disarma prima di scaricare.";
-  else if(flightLog.count)status.textContent=`${flightLog.count} campioni disponibili · ${(flightLog.count/flightLog.rate).toFixed(1)} secondi · ${flightLog.rate} Hz`;
-  else status.textContent="Nessun log disponibile.";
+  if(flightLog.recording)status.textContent="Recording in progress: disarm before downloading.";
+  else if(flightLog.count)status.textContent=`${flightLog.count} samples available · ${(flightLog.count/flightLog.rate).toFixed(1)} seconds · ${flightLog.rate} Hz`;
+  else status.textContent="No flight log available.";
   $("#downloadFlightLogButton").disabled=!state.connected||flightLog.recording||flightLog.count===0||flightLog.downloading;
 }
 function startFlightLogDownload(){
   if(!state.connected||flightLog.recording||!flightLog.count)return;
   flightLog.downloading=true;flightLog.records=[];$("#downloadFlightLogButton").disabled=true;
-  $("#flightLogStatus").textContent="Download del log in corso…";
+  $("#flightLogStatus").textContent="Downloading flight log…";
   $("#flightLogProgress").style.width="0%";
   send("GET_FLIGHT_LOG_CHUNK 0 8",false);
 }
@@ -417,7 +455,7 @@ function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
   const file={format:"FlightCode-Flight-Log",version:1,created:new Date().toISOString(),
-    board:"MAMBAF411",sampleRateHz:flightLog.rate,
+    board:state.board||"UNKNOWN",sampleRateHz:flightLog.rate,
     alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:$("#motorDirection").value,rates:getRates(),
     feedforward:getFeedforward(),
@@ -427,7 +465,7 @@ function finishFlightLogDownload(){
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`FlightCode-FLIGHT-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
-  $("#flightLogProgress").style.width="100%";updateFlightLogUi();toast("Log di volo scaricato");
+  $("#flightLogProgress").style.width="100%";updateFlightLogUi();toast("Flight log downloaded");
 }
 function telemetry(parts){
   if(parts.length<32)return;const timestamp=Number(parts[2]),signal=parts[3]==="1",armed=parts[4]==="1";
@@ -436,22 +474,22 @@ function telemetry(parts){
   state.armed=armed;updateDfuButton();
   if(wasArmed&&!armed)setTimeout(()=>send("GET_FLIGHT_LOG_INFO",false),100);
   if(calibrated&&!state.calibrated){
-    resetAttitude();toast("Calibrazione gyro completata");
+    resetAttitude();toast("Gyroscope calibration completed");
   }
   state.calibrated=calibrated;
-  $("#loopFrequency").textContent=Math.round(Number(parts[5])).toLocaleString("it-IT");
+  $("#loopFrequency").textContent=Math.round(Number(parts[5])).toLocaleString("en-US");
   $("#loopMaxPeriod").textContent=parts.length>33?Math.round(Number(parts[33])):"—";
-  $("#gyroPitchRaw").textContent=parts.length>34?`GREZZO: ${Number(parts[34]).toFixed(1)}`:"GREZZO: —";
+  $("#gyroPitchRaw").textContent=parts.length>34?`RAW: ${Number(parts[34]).toFixed(1)}`:"RAW: —";
   const gyro=parts.slice(6,9).map(Number),accel=parts.slice(9,12).map(Number);
   const channelValues=parts.slice(12,28).map(Number),motorValues=parts.slice(28,32).map(Number);
   attitude(timestamp,gyro,accel);recordImuDiagnostic(timestamp,gyro,accel);
   recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,motorValues);
   channels(channelValues);motors(motorValues);
   badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
-  badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRAZIONE",armed?"armed":calibrated?"online":"");
+  badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRATING",armed?"armed":calibrated?"online":"");
 }
 function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>$(`#${key}${term}`).value=Number(values[i++]).toFixed(4)))}
-function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value);if(!Number.isFinite(value)||value<0||value>1000)throw new Error(`Valore ${label} ${term} non valido`);return value}))}
+function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value);if(!Number.isFinite(value)||value<0||value>1000)throw new Error(`Invalid ${label} ${term} value`);return value}))}
 function setRates(values){["rollRate","pitchRate","yawRate"].forEach((id,i)=>$(`#${id}`).value=Number(values[i]).toFixed(0));$("#rateExpo").value=Number(values[3]).toFixed(2)}
 function getRates(){
   const values=["rollRate","pitchRate","yawRate","rateExpo"].map(id=>Number($(`#${id}`).value));
@@ -476,13 +514,13 @@ function getTpa(){
 function tpaCommand(){const t=getTpa();return `SET_TPA ${t.attenuation/100} ${t.breakpoint}`}
 function setActiveTuningProfile(name){
   document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.classList.toggle("active",button.dataset.tuningProfile===name));
-  $("#activeTuningProfile").textContent=name&&tuningProfiles[name]?tuningProfiles[name].label:"PERSONALIZZATO";
+  $("#activeTuningProfile").textContent=name&&tuningProfiles[name]?tuningProfiles[name].label:"CUSTOM";
 }
 function applyTuningProfile(name){
   const profile=tuningProfiles[name];if(!profile||!state.connected)return;
   setPids(profile.pids);$("#rateExpo").value=profile.expo.toFixed(2);setFeedforward(profile.ff);setTpa(profile.tpa);
-  setActiveTuningProfile(name);saveState("Preset da applicare","dirty");
-  toast(`Profilo ${profile.label} caricato: premi Applica o Salva`);
+  setActiveTuningProfile(name);saveState("Preset ready to apply","dirty");
+  toast(`${profile.label} profile loaded: select Apply or Save`);
 }
 document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.onclick=()=>applyTuningProfile(button.dataset.tuningProfile));
 document.querySelectorAll("[data-pid],[data-rate],[data-feedforward],[data-tpa]").forEach(input=>input.addEventListener("input",()=>setActiveTuningProfile(null)));
@@ -491,7 +529,27 @@ function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{co
 function line(value){
   log(value);if(!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
   if(p[1]==="TELEMETRY"){telemetry(p);return}
-  if(p[1]==="HELLO"){if(p[2]!=="FlightCode"){toast(`Dispositivo non riconosciuto: ${p[2]||"sconosciuto"}`);return}state.board=p[4]||"SCONOSCIUTA";$("#deviceName").textContent=`${p[2]} · ${state.board}`;$("#protocolText").textContent=`Protocollo v${p[3]||"1"}`;view("setup");toast(`${state.board} rilevata`);send("GET_FLIGHT_LOG_INFO",false);return}
+  if(p[1]==="HELLO"){
+    if(!["FlightCode","FlightCodePI"].includes(p[2])){toast(`Unrecognized device: ${p[2]||"unknown"}`);return}
+    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();
+    if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
+    if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
+    updateMotorProtocolOptions();applyCapabilities();
+    $("#deviceName").textContent=`FlightCode · ${state.board}`;$("#protocolText").textContent=`Protocol v${state.protocol}`;view("setup");toast(`${state.board} detected`);
+    if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
+    return;
+  }
+  if(p[1]==="CAPABILITIES"){
+    state.capabilities=new Set(p.slice(2));updateMotorProtocolOptions();applyCapabilities();
+    if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
+    return;
+  }
+  if(p[1]==="IMU"){
+    const available=p.at(-1)==="1",name=p.slice(2,-1).join(" ");
+    $("#deviceName").textContent=`FlightCode · ${state.board} · ${name}`;
+    if(!available)toast(`IMU not detected: ${name}`);
+    return;
+  }
   if(p[1]==="FLIGHT_LOG_INFO"){
     flightLog.count=Number(p[2])||0;flightLog.rate=Number(p[3])||200;flightLog.recording=p[4]==="1";
     flightLog.receiverDiagnostics=p.length>=10?{
@@ -516,70 +574,73 @@ function line(value){
     if(next<flightLog.count)send(`GET_FLIGHT_LOG_CHUNK ${next} 8`,false);else finishFlightLogDownload();
     return;
   }
-  if(p[1]==="PIDS"&&p.length>=12){setPids(p.slice(2,11));setActiveTuningProfile(null);saveState(p[11]==="1"?"Salvato nella flash":"Modifiche non salvate",p[11]==="1"?"saved":"dirty");return}
-  if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Salvato nella flash":"Modifiche non salvate",p[6]==="1"?"saved":"dirty");return}
-  if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Salvato nella flash":"Modifiche non salvate",p[5]==="1"?"saved":"dirty");return}
-  if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Salvato nella flash":"Modifiche non salvate",p[4]==="1"?"saved":"dirty");return}
-  if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Salvato nella flash":"Modifiche non salvate",p[5]==="1"?"saved":"dirty");return}
-  if(p[1]==="MOTOR_PROTOCOL"){if(["MULTISHOT","ONESHOT125","DSHOT300"].includes(p[2]))$("#motorProtocol").value=p[2];return}
+  if(p[1]==="PIDS"&&p.length>=12){setPids(p.slice(2,11));setActiveTuningProfile(null);saveState(p[11]==="1"?"Saved to flash":"Unsaved changes",p[11]==="1"?"saved":"dirty");return}
+  if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
+  if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
+  if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
+  if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
+  if(p[1]==="MOTOR_PROTOCOL"){
+    if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
+    $("#motorProtocol").value=p[2];return;
+  }
   if(p[1]==="MOTOR_DIRECTION"){if(["NORMAL","REVERSED"].includes(p[2]))$("#motorDirection").value=p[2];return}
   if(p[1]==="MOTOR_IDLE"){const value=Number(p[2]);if(Number.isFinite(value))$("#motorIdlePercent").value=value.toFixed(1);return}
   if(p[1]==="OK"){
     if(p[2]==="MOTOR_TEST_ENABLED"){
       state.motorTest=true;setMotorControls(true);clearInterval(state.motorHeartbeat);
       sendMotorTest();state.motorHeartbeat=setInterval(sendMotorTest,100);
-      toast("Test motori abilitato");
+      toast("Motor test enabled");
     }else if(p[2]==="MOTOR_TEST_DISABLED"){
-      resetMotorTestUi();toast("Test motori disabilitato");
-    }else toast(p[2]==="ENTER_DFU"?"Avvio modalità DFU…":p[2]==="SAVE_PIDS"?"PID salvati nella flash":p[2]==="SET_PIDS"?"PID applicati":"Valori ripristinati");
+      resetMotorTestUi();toast("Motor test disabled");
+    }else toast(p[2]==="ENTER_DFU"?"Starting DFU mode…":["SAVE_PIDS","SAVE_SETTINGS"].includes(p[2])?"Settings saved to flash":p[2]==="SET_PIDS"?"PIDs applied":"Values updated");
   }
   if(p[1]==="ERROR"){
-    if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"){resetMotorTestUi();toast("Abbassa CH6: il test motori richiede il quad disarmato")}
-    else if(p[2]==="MOTOR_TEST_DISABLED"){resetMotorTestUi();toast("Test motori interrotto: abilitalo nuovamente")}
-    else toast(`Errore scheda: ${p.slice(2).join(" ")}`);
+    if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"){resetMotorTestUi();toast("Lower CH6: motor testing requires the quad to be disarmed")}
+    else if(p[2]==="MOTOR_TEST_DISABLED"){resetMotorTestUi();toast("Motor test interrupted: enable it again")}
+    else toast(`Board error: ${p.slice(2).join(" ")}`);
   }
 }
 async function readLoop(){
   const decoder=new TextDecoder();
   try{while(state.connected&&state.port?.readable){state.reader=state.port.readable.getReader();try{while(state.connected){const{value,done}=await state.reader.read();if(done)break;state.buffer+=decoder.decode(value,{stream:true});const lines=state.buffer.split(/\r?\n/);state.buffer=lines.pop()||"";lines.filter(Boolean).forEach(line)}}finally{state.reader.releaseLock();state.reader=null}}}
-  catch(error){if(state.connected&&!state.closing){log(`Connessione terminata: ${error.message}`,"SYS");await disconnect()}}
+  catch(error){if(state.connected&&!state.closing){log(`Connection ended: ${error.message}`,"SYS");await disconnect()}}
 }
 async function connect(){
-  if(!("serial"in navigator)){toast("Usa Chrome o Edge: Web Serial non è disponibile");return}
-  try{state.port=await navigator.serial.requestPort({filters:[{usbVendorId:0x0483,usbProductId:0x5740}]});await state.port.open({baudRate:115200});state.writer=state.port.writable.getWriter();connected(true);state.task=readLoop();state.heartbeat=setInterval(()=>send("PING",false),1000);await send("HELLO")}
-  catch(error){toast(error.name==="NotFoundError"?"Connessione annullata":error.message)}
+  if(!("serial"in navigator)){toast("Use Chrome or Edge: Web Serial is not available");return}
+  try{state.port=await navigator.serial.requestPort();await state.port.open({baudRate:115200});state.writer=state.port.writable.getWriter();connected(true);state.task=readLoop();state.heartbeat=setInterval(()=>send("PING",false),1000);await send("HELLO")}
+  catch(error){toast(error.name==="NotFoundError"?"Connection cancelled":error.message)}
 }
 async function disconnect(){
   if(state.closing)return;state.closing=true;
   try{clearInterval(state.heartbeat);clearInterval(state.motorHeartbeat);if(state.writer&&state.motorTest)await send("MOTOR_TEST_ENABLE 0",false);if(state.writer)await send("BYE",false);state.connected=false;if(state.reader)await state.reader.cancel();if(state.task)await state.task;if(state.writer)state.writer.releaseLock();if(state.port)await state.port.close()}
-  catch(error){log(`Chiusura porta: ${error.message}`,"SYS")}
-  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,lastUs:null,calibrated:false,closing:false});connected(false)}
+  catch(error){log(`Port closing error: ${error.message}`,"SYS")}
+  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,lastUs:null,calibrated:false,closing:false,board:"",protocol:0,capabilities:new Set()});connected(false)}
 }
 buttons.connect.onclick=()=>state.connected?disconnect():connect();
-buttons.read.onclick=async()=>{await send("GET_PIDS");await send("GET_RATES");await send("GET_FEEDFORWARD");await send("GET_TPA")};
-buttons.apply.onclick=async()=>{try{await send(`SET_PIDS ${getPids().join(" ")}`);await send(ratesCommand());await send(feedforwardCommand());await send(tpaCommand())}catch(error){toast(error.message)}};
-buttons.save.onclick=async()=>{try{await send(`SET_PIDS ${getPids().join(" ")}`);await send(ratesCommand());await send(feedforwardCommand());await send(tpaCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
+buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA")};
+buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand())}catch(error){toast(error.message)}};
+buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
-buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_PIDS")};
+buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorDirection.onclick=async()=>{await send(`SET_MOTOR_DIRECTION ${$("#motorDirection").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorIdle.onclick=async()=>{
   const value=Number($("#motorIdlePercent").value);
-  if(!Number.isFinite(value)||value<1||value>10){toast("Idle motori: inserisci un valore tra 1% e 10%");return}
+  if(!Number.isFinite(value)||value<1||value>10){toast("Motor idle: enter a value between 1% and 10%");return}
   await send(`SET_MOTOR_IDLE ${value}`);await send("SAVE_SETTINGS");
 };
 buttons.applyAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);resetAttitude()}catch(error){toast(error.message)}};
 buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);await send("SAVE_SETTINGS");resetAttitude()}catch(error){toast(error.message)}};
 $("#resetAttitudeButton").onclick=resetAttitude;
 $("#calibrateGyroButton").onclick=async()=>{
-  if(state.armed){toast("Disarma il quad prima della calibrazione");return}
-  if(!confirm("Appoggia il quad immobile e in piano. Avviare la calibrazione gyro?"))return;
-  await send("CALIBRATE_GYRO");toast("Calibrazione: non muovere il quad");
+  if(state.armed){toast("Disarm the quad before calibration");return}
+  if(!confirm("Place the quad still and level. Start gyroscope calibration?"))return;
+  await send("CALIBRATE_GYRO");toast("Calibration in progress: do not move the quad");
 };
 $("#startImuDiagnosticButton").onclick=startImuDiagnostic;
 $("#cancelImuDiagnosticButton").onclick=()=>cancelImuDiagnostic();
 $("#downloadImuDiagnosticButton").onclick=downloadImuDiagnostic;
 $("#pidDiagnosticSafety").onchange=event=>{
-  $("#startPidDiagnosticButton").disabled=!state.connected||!event.target.checked||pidDiagnostic.running;
+  $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!event.target.checked||pidDiagnostic.running;
 };
 $("#startPidDiagnosticButton").onclick=startPidDiagnostic;
 $("#cancelPidDiagnosticButton").onclick=()=>cancelPidDiagnostic();
@@ -587,14 +648,14 @@ $("#downloadPidDiagnosticButton").onclick=downloadPidDiagnostic;
 $("#refreshFlightLogButton").onclick=()=>send("GET_FLIGHT_LOG_INFO");
 $("#downloadFlightLogButton").onclick=startFlightLogDownload;
 $("#enterDfuButton").onclick=async()=>{
-  if(!confirm("Riavviare la scheda in modalità DFU? La connessione seriale verrà chiusa."))return;
+  if(!confirm("Restart the board in DFU mode? The serial connection will be closed."))return;
   $("#enterDfuButton").disabled=true;
   await send("ENTER_DFU");
 };
-document.querySelectorAll("[data-pid]").forEach(input=>input.oninput=()=>saveState("Modifiche locali","dirty"));
-document.querySelectorAll("[data-rate]").forEach(input=>input.oninput=()=>saveState("Modifiche locali","dirty"));
-document.querySelectorAll("[data-feedforward]").forEach(input=>input.oninput=()=>saveState("Modifiche locali","dirty"));
-document.querySelectorAll("[data-alignment]").forEach(input=>input.oninput=()=>saveState("Modifiche locali","dirty"));
+document.querySelectorAll("[data-pid]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
+document.querySelectorAll("[data-rate]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
+document.querySelectorAll("[data-feedforward]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
+document.querySelectorAll("[data-alignment]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 navigator.serial?.addEventListener("disconnect",()=>disconnect());connected(false);
 
 function motorTestValues(){return [0,1,2,3].map(i=>Number($(`#motorTestSlider${i}`).value))}
@@ -602,7 +663,7 @@ async function sendMotorTest(){if(state.motorTest)await send(`MOTOR_TEST ${motor
 function setMotorControls(enabled){
   $("#masterMotorSlider").disabled=!enabled;
   for(let i=0;i<4;i++)$(`#motorTestSlider${i}`).disabled=!enabled;
-  badge($("#motorTestState"),enabled?"ATTIVO":"BLOCCATO",enabled?"armed":"");
+  badge($("#motorTestState"),enabled?"ACTIVE":"LOCKED",enabled?"armed":"");
   updateDfuButton();
 }
 function resetMotorTestUi(){

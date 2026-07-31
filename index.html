@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -10,25 +10,25 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <img class="brand-logo" src="assets/flightcode-logo.png" alt="Logo FlightCode">
+      <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
       <div><b>FlightCode</b><small>CONFIGURATOR</small></div>
     </div>
-    <div class="connection"><i id="connectionDot"></i><span id="connectionText">Scheda non collegata</span>
-      <button id="connectButton" class="button primary">Connetti</button></div>
+    <div class="connection"><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
+      <button id="connectButton" class="button primary">Connect</button></div>
   </header>
   <div class="shell">
     <aside>
-      <p class="nav-title">CONFIGURAZIONE</p>
+      <p class="nav-title">CONFIGURATION</p>
       <button class="nav active" data-view="setup"><span>01</span>Setup 3D</button>
-      <button class="nav" data-view="receiver"><span>02</span>Ricevente</button>
+      <button class="nav" data-view="receiver"><span>02</span>Receiver</button>
       <button class="nav" data-view="pid"><span>03</span>PID Tuning</button>
-      <button class="nav" data-view="motors"><span>04</span>Motori</button>
-      <button class="nav" data-view="diagnostic"><span>05</span>Diagnostica IMU</button>
-      <div class="device"><i id="deviceDot"></i><div><b id="deviceName">Nessun dispositivo</b><small id="protocolText">USB seriale</small></div></div>
+      <button class="nav" data-view="motors"><span>04</span>Motors</button>
+      <button class="nav" data-view="diagnostic"><span>05</span>IMU Diagnostics</button>
+      <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b><small id="protocolText">USB serial</small></div></div>
     </aside>
     <main>
       <section id="setupView" class="view active">
-        <header class="heading"><div><small>SETUP / ORIENTAMENTO</small><h1>Assetto in tempo reale</h1></div><b id="flightState" class="badge">OFFLINE</b></header>
+        <header class="heading"><div><small>SETUP / ORIENTATION</small><h1>Live attitude</h1></div><b id="flightState" class="badge">OFFLINE</b></header>
         <div class="setup-grid">
           <div class="setup-visual">
           <article class="model-panel">
@@ -47,171 +47,171 @@
           <article class="card motor-output-card"><header>MOTOR OUTPUT <small>%</small></header><div id="motorOutputs"></div></article>
           </div>
           <div class="telemetry">
-            <article class="card loop"><header>CONTROL LOOP <small>LIVE</small></header><strong id="loopFrequency">—</strong><span>Hz</span><p>Periodo massimo: <b id="loopMaxPeriod">—</b> µs</p></article>
+            <article class="card loop"><header>CONTROL LOOP <small>LIVE</small></header><strong id="loopFrequency">—</strong><span>Hz</span><p>Maximum period: <b id="loopMaxPeriod">—</b> µs</p></article>
             <article class="card"><header>GYROSCOPE <small>°/s</small></header><div class="triple">
-              <div><small>ROLL</small><b id="gyroRoll">0.0</b></div><div><small>PITCH</small><b id="gyroPitch">0.0</b><small id="gyroPitchRaw">GREZZO: —</small></div><div><small>YAW</small><b id="gyroYaw">0.0</b></div>
+              <div><small>ROLL</small><b id="gyroRoll">0.0</b></div><div><small>PITCH</small><b id="gyroPitch">0.0</b><small id="gyroPitchRaw">RAW: —</small></div><div><small>YAW</small><b id="gyroYaw">0.0</b></div>
             </div></article>
-            <article class="card"><header>ACCELEROMETRO <small>G</small></header><div class="triple">
+            <article class="card"><header>ACCELEROMETER <small>G</small></header><div class="triple">
               <div><small>X</small><b id="accelX">0.00</b></div><div><small>Y</small><b id="accelY">0.00</b></div><div><small>Z</small><b id="accelZ">0.00</b></div>
             </div></article>
-            <article class="card"><header>ASSETTO <small>GRADI</small></header><div class="triple">
+            <article class="card"><header>ATTITUDE <small>DEGREES</small></header><div class="triple">
               <div><small>ROLL</small><b id="attitudeRoll">0.0</b></div><div><small>PITCH</small><b id="attitudePitch">0.0</b></div><div><small>YAW</small><b id="attitudeYaw">0.0</b></div>
             </div></article>
-            <article class="card alignment-card"><header>ALLINEAMENTO FC <small>GRADI</small></header>
+            <article class="card alignment-card"><header>FC ALIGNMENT <small>DEGREES</small></header>
               <div class="alignment-fields">
                 <label>ROLL<input id="boardRoll" data-alignment type="number" min="-180" max="180" step="1" value="0" disabled></label>
                 <label>PITCH<input id="boardPitch" data-alignment type="number" min="-180" max="180" step="1" value="0" disabled></label>
                 <label>YAW<input id="boardYaw" data-alignment type="number" min="-180" max="180" step="1" value="0" disabled></label>
               </div>
               <div class="alignment-actions">
-                <button id="applyAlignmentButton" class="button secondary" disabled>Applica</button>
-                <button id="saveAlignmentButton" class="button primary" disabled>Salva</button>
+                <button id="applyAlignmentButton" class="button secondary" disabled>Apply</button>
+                <button id="saveAlignmentButton" class="button primary" disabled>Save</button>
               </div>
             </article>
-            <button id="resetAttitudeButton" class="button ghost">Azzera orientamento 3D</button>
-            <button id="calibrateGyroButton" class="button secondary" disabled>Ricalibra gyro</button>
-            <button id="enterDfuButton" class="button secondary" disabled>Riavvia in modalità DFU</button>
+            <button id="resetAttitudeButton" class="button ghost">Reset 3D orientation</button>
+            <button id="calibrateGyroButton" class="button secondary" disabled>Recalibrate gyro</button>
+            <button id="enterDfuButton" class="button secondary" disabled>Restart in DFU mode</button>
           </div>
         </div>
       </section>
       <section id="receiverView" class="view">
-        <header class="heading"><div><small>INPUT / SBUS</small><h1>Canali ricevente</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
+        <header class="heading"><div><small>INPUT / SBUS</small><h1>Receiver channels</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
         <div id="channelGrid" class="channels"></div>
       </section>
       <section id="pidView" class="view">
-        <header class="heading"><div><small>FLIGHT TUNING / RATE MODE</small><h1>Parametri PID</h1></div><b id="saveState" class="save-state">Non collegato</b></header>
+        <header class="heading"><div><small>FLIGHT TUNING / RATE MODE</small><h1>PID parameters</h1></div><b id="saveState" class="save-state">Not connected</b></header>
         <article class="tuning-profiles">
           <div>
-            <small>PROFILO DI VOLO</small>
-            <h2>Ottimizzazione rapida</h2>
-            <p>I preset compilano PID, expo e feedforward. Controlla i valori, poi usa Applica o Salva nella flash.</p>
+            <small>FLIGHT PROFILE</small>
+            <h2>Quick tuning</h2>
+            <p>Presets fill in PID, expo, and feedforward values. Review them, then select Apply or Save to flash.</p>
           </div>
           <div class="profile-buttons">
-            <button class="profile-button" data-tuning-profile="balanced" disabled><b>Bilanciato</b><small>Prevedibile e progressivo</small></button>
-            <button class="profile-button" data-tuning-profile="racing" disabled><b>Racing</b><small>Diretto e reattivo</small></button>
-            <button class="profile-button" data-tuning-profile="freestyle" disabled><b>Freestyle</b><small>Fluido e acrobatico</small></button>
+            <button class="profile-button" data-tuning-profile="balanced" disabled><b>Balanced</b><small>Predictable and progressive</small></button>
+            <button class="profile-button" data-tuning-profile="racing" disabled><b>Racing</b><small>Direct and responsive</small></button>
+            <button class="profile-button" data-tuning-profile="freestyle" disabled><b>Freestyle</b><small>Smooth and acrobatic</small></button>
           </div>
-          <span id="activeTuningProfile" class="profile-state">PERSONALIZZATO</span>
+          <span id="activeTuningProfile" class="profile-state">CUSTOM</span>
         </article>
         <div id="pidGrid" class="pid-grid"></div>
         <article class="rates-card">
-          <header><div><small>RISPOSTA STICK</small><h2>Rate ed expo</h2></div>
-            <p>Expo addolcisce il centro stick mantenendo la velocità massima alle estremità.</p></header>
+          <header><div><small>STICK RESPONSE</small><h2>Rates and expo</h2></div>
+            <p>Expo softens the stick center while preserving maximum rate at the endpoints.</p></header>
           <div class="rates-fields">
             <label>Roll max <span>°/s</span><input id="rollRate" data-rate type="number" min="100" max="1200" step="10" value="500" disabled></label>
             <label>Pitch max <span>°/s</span><input id="pitchRate" data-rate type="number" min="100" max="1200" step="10" value="500" disabled></label>
             <label>Yaw max <span>°/s</span><input id="yawRate" data-rate type="number" min="100" max="1200" step="10" value="400" disabled></label>
             <label>Expo <span>0–0,9</span><input id="rateExpo" data-rate type="number" min="0" max="0.9" step="0.01" value="0.35" disabled></label>
             <label>TPA <span>%</span><input id="tpaAttenuation" data-tpa type="number" min="0" max="100" step="1" value="0" disabled></label>
-            <label>Soglia TPA <span>throttle %</span><input id="tpaBreakpoint" data-tpa type="number" min="0" max="100" step="1" value="65" disabled></label>
+            <label>TPA breakpoint <span>throttle %</span><input id="tpaBreakpoint" data-tpa type="number" min="0" max="100" step="1" value="65" disabled></label>
           </div>
         </article>
-        <div class="actions"><button id="resetButton" class="button ghost" disabled>Ripristina valori</button><div>
-          <button id="readButton" class="button ghost" disabled>Rileggi</button>
-          <button id="applyButton" class="button secondary" disabled>Applica</button>
-          <button id="saveButton" class="button primary" disabled>Salva nella flash</button>
+        <div class="actions"><button id="resetButton" class="button ghost" disabled>Restore defaults</button><div>
+          <button id="readButton" class="button ghost" disabled>Read again</button>
+          <button id="applyButton" class="button secondary" disabled>Apply</button>
+          <button id="saveButton" class="button primary" disabled>Save to flash</button>
         </div></div>
       </section>
       <section id="motorsView" class="view">
-        <header class="heading"><div><small>OUTPUT / BANCO PROVA</small><h1>Test motori</h1></div><b id="motorTestState" class="badge">BLOCCATO</b></header>
+        <header class="heading"><div><small>OUTPUT / TEST BENCH</small><h1>Motor test</h1></div><b id="motorTestState" class="badge">LOCKED</b></header>
         <article class="protocol-card">
-          <div><small>USCITA MOTORI</small><h2>Protocollo ESC</h2>
-            <p>Il cambio è consentito soltanto a quad disarmato.</p></div>
+          <div><small>MOTOR OUTPUT</small><h2>ESC protocol</h2>
+            <p>The protocol can only be changed while the quad is disarmed.</p></div>
           <div class="protocol-control">
             <select id="motorProtocol" disabled>
               <option value="DSHOT300">DSHOT300</option>
               <option value="MULTISHOT">MultiShot · 5–25 µs</option>
               <option value="ONESHOT125">OneShot125 · 125–250 µs</option>
             </select>
-            <button id="applyProtocolButton" class="button secondary" disabled>Applica protocollo</button>
+            <button id="applyProtocolButton" class="button secondary" disabled>Apply protocol</button>
           </div>
         </article>
         <article class="protocol-card">
-          <div><small>MIXER YAW</small><h2>Direzione motori</h2>
-            <p>Seleziona invertita per M1/M4 antiorari e M2/M3 orari (props out).</p></div>
+          <div><small>YAW MIXER</small><h2>Motor direction</h2>
+            <p>Select reversed for counterclockwise M1/M4 and clockwise M2/M3 (props out).</p></div>
           <div class="protocol-control">
             <select id="motorDirection" disabled>
-              <option value="NORMAL">Normale · M1/M4 orari</option>
-              <option value="REVERSED">Invertita · M1/M4 antiorari</option>
+              <option value="NORMAL">Normal · M1/M4 clockwise</option>
+              <option value="REVERSED">Reversed · M1/M4 counterclockwise</option>
             </select>
-            <button id="applyMotorDirectionButton" class="button secondary" disabled>Applica e salva</button>
+            <button id="applyMotorDirectionButton" class="button secondary" disabled>Apply and save</button>
           </div>
         </article>
         <article class="protocol-card">
-          <div><small>ARM / MINIMO</small><h2>Velocità idle motori</h2>
-            <p>Comando minimo mantenuto quando il quad è armato e il throttle è a zero.</p></div>
+          <div><small>ARM / IDLE</small><h2>Motor idle speed</h2>
+            <p>Minimum output maintained while the quad is armed and throttle is at zero.</p></div>
           <div class="protocol-control">
             <input id="motorIdlePercent" type="number" min="1" max="10" step="0.1" value="3.0" disabled>
             <span>%</span>
-            <button id="applyMotorIdleButton" class="button secondary" disabled>Applica e salva</button>
+            <button id="applyMotorIdleButton" class="button secondary" disabled>Apply and save</button>
           </div>
         </article>
         <article class="motor-warning">
-          <strong>⚠ RIMUOVERE TUTTE LE ELICHE</strong>
-          <p>I motori possono partire immediatamente. Mantieni CH6 disarmato e collega la batteria soltanto dopo aver rimosso le eliche.</p>
-          <label><input id="motorSafetyCheck" type="checkbox" disabled> Confermo che le eliche sono state rimosse</label>
+          <strong>⚠ REMOVE ALL PROPELLERS</strong>
+          <p>The motors may start immediately. Keep CH6 disarmed and connect the battery only after removing the propellers.</p>
+          <label><input id="motorSafetyCheck" type="checkbox" disabled> I confirm that all propellers have been removed</label>
         </article>
         <article class="motor-test-panel">
           <div class="master-motor">
-            <div><strong>MASTER</strong><small>Tutti i motori</small></div>
+            <div><strong>MASTER</strong><small>All motors</small></div>
             <input id="masterMotorSlider" class="vertical-motor" type="range" min="0" max="100" step="1" value="0" disabled>
             <output id="masterMotorValue">0%</output>
           </div>
           <div id="motorTestGrid" class="motor-test-grid"></div>
         </article>
-        <p class="motor-hint">Riporta tutti i cursori a zero prima di disabilitare il test o scollegare la batteria.</p>
+        <p class="motor-hint">Return all sliders to zero before disabling the test or disconnecting the battery.</p>
       </section>
       <section id="diagnosticView" class="view">
-        <header class="heading"><div><small>SENSORI / ANALISI DA BANCO</small><h1>Diagnostica IMU</h1></div><b class="badge">SENZA ELICHE</b></header>
+        <header class="heading"><div><small>SENSORS / BENCH ANALYSIS</small><h1>IMU diagnostics</h1></div><b class="badge">NO PROPELLERS</b></header>
         <article class="imu-diagnostic">
           <div>
-            <small>PROCEDURA GUIDATA</small>
-            <h2>Verifica roll, pitch e yaw</h2>
-            <p id="imuDiagnosticInstruction">Registra posizioni guidate fino a ±180° e crea un file completo dell’orientamento 3D.</p>
+            <small>GUIDED PROCEDURE</small>
+            <h2>Verify roll, pitch, and yaw</h2>
+            <p id="imuDiagnosticInstruction">Record guided positions up to ±180° and create a complete 3D orientation file.</p>
             <div class="diagnostic-progress"><i id="imuDiagnosticProgress"></i></div>
-            <p id="imuDiagnosticResult" class="diagnostic-result">Pronta per iniziare.</p>
+            <p id="imuDiagnosticResult" class="diagnostic-result">Ready to begin.</p>
           </div>
           <div class="diagnostic-actions">
-            <button id="startImuDiagnosticButton" class="button primary" disabled>Avvia verifica</button>
-            <button id="cancelImuDiagnosticButton" class="button ghost" disabled>Annulla</button>
-            <button id="downloadImuDiagnosticButton" class="button secondary" disabled>Scarica file</button>
+            <button id="startImuDiagnosticButton" class="button primary" disabled>Start test</button>
+            <button id="cancelImuDiagnosticButton" class="button ghost" disabled>Cancel</button>
+            <button id="downloadImuDiagnosticButton" class="button secondary" disabled>Download file</button>
           </div>
         </article>
         <article class="diagnostic-help">
-          <h3>Come eseguire il test</h3>
-          <p>Appoggia prima il quad in piano. Segui lentamente ogni posizione indicata e mantienila fino alla fase successiva. La procedura prova ±90° e ±180° su roll, pitch e yaw, poi una rotazione combinata.</p>
-          <p>Il file registra a 100 Hz giroscopio, accelerometro, quaternione, angoli visualizzati e matrice CSS del modello.</p>
-          <p>Il quad deve essere disarmato e il test motori deve essere disabilitato.</p>
+          <h3>How to perform the test</h3>
+          <p>Begin with the quad level. Slowly follow each indicated position and hold it until the next stage. The procedure tests ±90° and ±180° on roll, pitch, and yaw, followed by a combined rotation.</p>
+          <p>The file records gyroscope, accelerometer, quaternion, displayed angles, and the model CSS matrix at 100 Hz.</p>
+          <p>The quad must be disarmed and the motor test must be disabled.</p>
         </article>
         <article class="pid-diagnostic">
           <div>
             <small>PID / MIXER</small>
-            <h2>Verifica simulata PID e mixer</h2>
-            <p id="pidDiagnosticInstruction">Controlla gyro e comandi radio calcolando M1–M4, con le uscite fisiche bloccate a zero.</p>
+            <h2>Simulated PID and mixer test</h2>
+            <p id="pidDiagnosticInstruction">Check gyroscope and radio commands while calculating M1–M4 with physical outputs locked at zero.</p>
             <div class="diagnostic-progress"><i id="pidDiagnosticProgress"></i></div>
-            <p id="pidDiagnosticResult" class="diagnostic-result">Pronta per iniziare.</p>
-            <label class="diagnostic-safety"><input id="pidDiagnosticSafety" type="checkbox" disabled> Confermo: eliche rimosse e batteria scollegata</label>
+            <p id="pidDiagnosticResult" class="diagnostic-result">Ready to begin.</p>
+            <label class="diagnostic-safety"><input id="pidDiagnosticSafety" type="checkbox" disabled> I confirm: propellers removed and battery disconnected</label>
           </div>
           <div class="diagnostic-actions">
-            <button id="startPidDiagnosticButton" class="button primary" disabled>Avvia verifica PID</button>
-            <button id="cancelPidDiagnosticButton" class="button ghost" disabled>Annulla</button>
-            <button id="downloadPidDiagnosticButton" class="button secondary" disabled>Scarica file</button>
+            <button id="startPidDiagnosticButton" class="button primary" disabled>Start PID test</button>
+            <button id="cancelPidDiagnosticButton" class="button ghost" disabled>Cancel</button>
+            <button id="downloadPidDiagnosticButton" class="button secondary" disabled>Download file</button>
           </div>
         </article>
         <article class="flight-log-card">
           <div>
             <small>BLACKBOX RAM</small>
-            <h2>Ultimo volo</h2>
-            <p id="flightLogStatus">Nessun log disponibile.</p>
+            <h2>Latest flight</h2>
+            <p id="flightLogStatus">No flight log available.</p>
             <div class="diagnostic-progress"><i id="flightLogProgress"></i></div>
           </div>
           <div class="diagnostic-actions">
-            <button id="refreshFlightLogButton" class="button ghost" disabled>Controlla log</button>
-            <button id="downloadFlightLogButton" class="button secondary" disabled>Scarica ultimo volo</button>
+            <button id="refreshFlightLogButton" class="button ghost" disabled>Check log</button>
+            <button id="downloadFlightLogButton" class="button secondary" disabled>Download latest flight</button>
           </div>
         </article>
       </section>
-      <details class="console"><summary>Comunicazione seriale <span id="messageCount">0 messaggi</span></summary><pre id="consoleOutput">Il protocollo del dispositivo apparirà qui.</pre></details>
+      <details class="console"><summary>Serial communication <span id="messageCount">0 messages</span></summary><pre id="consoleOutput">Device protocol messages will appear here.</pre></details>
     </main>
   </div>
   <div id="toast" class="toast" role="status"></div>
