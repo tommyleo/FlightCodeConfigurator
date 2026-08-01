@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const channelNames=["Throttle","Roll","Pitch","Yaw","Buzzer","Arm"];
+let receiverConfig={order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set()};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
@@ -38,9 +38,9 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,
 ]};
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null};
 const tuningProfiles={
-  balanced:{label:"BALANCED",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],expo:.35,ff:[.025,.025,.015],tpa:[0,65]},
-  racing:{label:"RACING",pids:[.10,.2,.0012,.10,.2,.0012,.13,.2,0],expo:.15,ff:[.032,.032,.020],tpa:[20,65]},
-  freestyle:{label:"FREESTYLE",pids:[.09,.22,.0014,.09,.22,.0014,.12,.22,0],expo:.35,ff:[.025,.025,.015],tpa:[0,65]}
+  balanced:{label:"BALANCED",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],rates:[540,540,410],expo:.35,ff:[.025,.025,.015],tpa:[0,65]},
+  racing:{label:"RACING",pids:[.1005,.2,.0013,.1005,.2,.0013,.155,.25,0],rates:[420,420,320],expo:.30,ff:[.025,.025,.015],tpa:[20,70]},
+  freestyle:{label:"FREESTYLE",pids:[.09,.22,.0014,.09,.22,.0014,.12,.22,0],rates:[650,650,500],expo:.35,ff:[.025,.025,.015],tpa:[0,65]}
 };
 const $=s=>document.querySelector(s);
 
@@ -53,8 +53,13 @@ axes.forEach(([key,label],axis)=>{
 });
 for(let i=0;i<16;i++){
   const row=document.createElement("article");row.className="channel";
-  row.innerHTML=`<div><b>CH${i+1}</b><small>${channelNames[i]||"Aux"}</small></div><div class="track"><i id="channelFill${i}"></i></div><output id="channelValue${i}">—</output>`;
+  row.innerHTML=`<div><b>CH${i+1}</b><small id="channelName${i}">AUX${Math.max(1,i-3)}</small></div><output id="channelValue${i}">—</output><div class="track"><i id="channelFill${i}"></i></div>`;
   $("#channelGrid").append(row);
+}
+for(let i=0;i<2;i++){
+  const row=document.createElement("div");row.className="receiver-mode";
+  row.innerHTML=`<select id="modeFunction${i}" data-receiver-config><option>ARM</option><option>BEEP</option></select><select id="modeChannel${i}" data-receiver-config>${Array.from({length:12},(_,n)=>`<option value="${n+5}">AUX${n+1} / CH${n+5}</option>`).join("")}</select><div class="range-wrap"><span id="modeRangeActive${i}" class="range-active"></span><input id="modeMin${i}" data-receiver-config type="range" min="900" max="2100" step="10"><input id="modeMax${i}" data-receiver-config type="range" min="900" max="2100" step="10"><div class="range-ruler">${[900,1100,1300,1500,1700,1900,2100].map(v=>`<span>${v}</span>`).join("")}</div></div><div class="mode-readout"><output id="modeRangeValue${i}"></output><strong id="modeLiveStatus${i}" class="mode-live-status">INACTIVE</strong><small id="modeLiveValue${i}">—</small></div>`;
+  $("#receiverModes").append(row);
 }
 for(let i=0;i<4;i++){
   const row=document.createElement("div");row.className="motor-row";
@@ -69,6 +74,30 @@ buttons.applyProtocol=$("#applyProtocolButton");
 buttons.applyAlignment=$("#applyAlignmentButton");buttons.saveAlignment=$("#saveAlignmentButton");
 buttons.applyMotorDirection=$("#applyMotorDirectionButton");
 buttons.applyMotorIdle=$("#applyMotorIdleButton");
+buttons.applyReceiver=$("#applyReceiverConfigButton");buttons.saveReceiver=$("#saveReceiverConfigButton");
+function updateReceiverLabels(){
+  const primary=receiverConfig.order==="AETR1234"?["Roll","Pitch","Throttle","Yaw"]:["Throttle","Roll","Pitch","Yaw"];
+  for(let i=0;i<16;i++)$(`#channelName${i}`).textContent=primary[i]||`AUX${i-3}`;
+  receiverConfig.modes.forEach(mode=>{if(mode.channel>=5&&mode.channel<=16)$(`#channelName${mode.channel-1}`).textContent=mode.fn});
+}
+function updateModeRange(i){
+  const minEl=$(`#modeMin${i}`),maxEl=$(`#modeMax${i}`);let min=Number(minEl.value),max=Number(maxEl.value);
+  if(min>=max){if(document.activeElement===minEl)min=max-10;else max=min+10;minEl.value=min;maxEl.value=max}
+  const left=(min-900)/12,width=(max-min)/12;$(`#modeRangeActive${i}`).style.cssText=`left:${left}%;width:${width}%`;$(`#modeRangeValue${i}`).textContent=`${min}–${max} µs`;
+}
+function setReceiverConfig(config,saved=false){
+  receiverConfig=config;$("#receiverChannelOrder").value=config.order;
+  config.modes.forEach((mode,i)=>{$(`#modeFunction${i}`).value=mode.fn;$(`#modeChannel${i}`).value=mode.channel;$(`#modeMin${i}`).value=mode.min;$(`#modeMax${i}`).value=mode.max;updateModeRange(i)});
+  $("#receiverConfigState").textContent=saved?"Saved to flash":"Unsaved changes";updateReceiverLabels();
+}
+function getReceiverConfig(){
+  const modes=[0,1].map(i=>({fn:$(`#modeFunction${i}`).value,channel:Number($(`#modeChannel${i}`).value),min:Number($(`#modeMin${i}`).value),max:Number($(`#modeMax${i}`).value)}));
+  if(new Set(modes.map(m=>m.fn)).size!==2)throw new Error("Select ARM and BEEP once each");
+  if(modes.some(m=>m.min>=m.max))throw new Error("Each mode needs a valid minimum and maximum");
+  return {order:$("#receiverChannelOrder").value,modes};
+}
+function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn==="ARM"),beep=c.modes.find(m=>m.fn==="BEEP");return `SET_RECEIVER_CONFIG ${c.order} ${arm.channel} ${arm.min} ${arm.max} ${beep.channel} ${beep.min} ${beep.max}`}
+[0,1].forEach(i=>{$(`#modeMin${i}`).oninput=()=>updateModeRange(i);$(`#modeMax${i}`).oninput=()=>updateModeRange(i)});setReceiverConfig(receiverConfig);
 function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}View`));document.querySelectorAll(".nav").forEach(v=>v.classList.toggle("active",v.dataset.view===name))}
 document.querySelectorAll(".nav").forEach(v=>v.onclick=()=>view(v.dataset.view));
 function badge(el,text,type=""){el.textContent=text;el.className=`badge ${type}`}
@@ -97,6 +126,7 @@ function applyCapabilities(){
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
+  setCapabilityControls("[data-receiver-config],#applyReceiverConfigButton,#saveReceiverConfigButton","RECEIVER_CONFIG");
   setCapabilityControls("#motorSafetyCheck","MOTOR_TEST");
   setCapabilityControls("#startImuDiagnosticButton","TELEMETRY");
   setCapabilityControls("#startStationaryDiagnosticButton","GYRO_CALIBRATION");
@@ -231,7 +261,8 @@ function attitude(timestamp,gyro,accel){
   $("#accelX").textContent=accel[0].toFixed(2);$("#accelY").textContent=accel[1].toFixed(2);$("#accelZ").textContent=accel[2].toFixed(2);
   $("#attitudeRoll").textContent=state.angle.roll.toFixed(1);$("#attitudePitch").textContent=state.angle.pitch.toFixed(1);$("#attitudeYaw").textContent=state.angle.yaw.toFixed(1);
 }
-function channels(values){values.forEach((value,i)=>{const pct=Math.max(0,Math.min(100,(value-1000)/10));$(`#channelFill${i}`).style.width=`${pct}%`;$(`#channelFill${i}`).style.background=i===4&&value>2000?"var(--orange)":"var(--cyan)";$(`#channelValue${i}`).textContent=`${Math.round(value)} µs`})}
+let pendingChannelValues=null,channelFramePending=false;
+function channels(values){pendingChannelValues=values;if(channelFramePending)return;channelFramePending=true;requestAnimationFrame(()=>{channelFramePending=false;pendingChannelValues.forEach((value,i)=>{const pct=Math.max(0,Math.min(100,(value-900)/12)),mode=receiverConfig.modes.find(m=>m.channel===i+1),active=mode&&value>=mode.min&&value<=mode.max;$(`#channelFill${i}`).style.width=`${pct}%`;$(`#channelFill${i}`).style.background=active?"var(--green)":"var(--cyan)";$(`#channelValue${i}`).textContent=`${Math.round(value)} µs`});receiverConfig.modes.forEach((mode,i)=>{const value=pendingChannelValues[mode.channel-1],active=Number.isFinite(value)&&value>=mode.min&&value<=mode.max,row=$(`#modeFunction${i}`).closest(".receiver-mode");row.classList.toggle("active",active);$(`#modeLiveStatus${i}`).textContent=active?"ACTIVE":"INACTIVE";$(`#modeLiveValue${i}`).textContent=Number.isFinite(value)?`${Math.round(value)} µs live`:"—"})})}
 function motors(values){values.forEach((value,i)=>{$(`#motorFill${i}`).style.width=`${Math.max(0,Math.min(100,value))}%`;$(`#motorValue${i}`).textContent=value.toFixed(1)})}
 function diagnosticUi(instruction,result,type="",progress=0){
   $("#imuDiagnosticInstruction").textContent=instruction;
@@ -599,7 +630,8 @@ function telemetry(parts){
   const temperatureC=parts.length>=39?Number(parts[38]):NaN;
   $("#gyroPitchRaw").textContent=Number.isFinite(rawGyro[1])?`RAW: ${rawGyro[1].toFixed(1)}`:"RAW: —";
   const gyro=parts.slice(6,9).map(Number),accel=parts.slice(9,12).map(Number);
-  const channelValues=parts.slice(12,28).map(Number),motorValues=parts.slice(28,32).map(Number);
+  const channelValues=signal?parts.slice(12,28).map(Number):Array(16).fill(0);
+  const motorValues=signal?parts.slice(28,32).map(Number):Array(4).fill(0);
   attitude(timestamp,gyro,accel);recordImuDiagnostic(timestamp,gyro,accel);
   recordStationaryDiagnostic(timestamp,gyro,accel,rawGyro,calibrationSamples,temperatureC,calibrated);
   recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,motorValues);
@@ -637,7 +669,7 @@ function setActiveTuningProfile(name){
 }
 function applyTuningProfile(name){
   const profile=tuningProfiles[name];if(!profile||!state.connected)return;
-  setPids(profile.pids);$("#rateExpo").value=profile.expo.toFixed(2);setFeedforward(profile.ff);setTpa(profile.tpa);
+  setPids(profile.pids);if(profile.rates)setRates([...profile.rates,profile.expo]);else $("#rateExpo").value=profile.expo.toFixed(2);setFeedforward(profile.ff);setTpa(profile.tpa);
   setActiveTuningProfile(name);saveState("Preset ready to apply","dirty");
   toast(`${profile.label} profile loaded: select Apply or Save`);
 }
@@ -697,6 +729,7 @@ function line(value){
   if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
+  if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
   if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="MOTOR_PROTOCOL"){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
@@ -736,7 +769,7 @@ async function disconnect(){
   finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,lastUs:null,calibrated:false,closing:false,board:"",protocol:0,capabilities:new Set()});connected(false)}
 }
 buttons.connect.onclick=()=>state.connected?disconnect():connect();
-buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA")};
+buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
 buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand())}catch(error){toast(error.message)}};
 buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
@@ -747,6 +780,8 @@ buttons.applyMotorIdle.onclick=async()=>{
   if(!Number.isFinite(value)||value<1||value>10){toast("Motor idle: enter a value between 1% and 10%");return}
   await send(`SET_MOTOR_IDLE ${value}`);await send("SAVE_SETTINGS");
 };
+buttons.applyReceiver.onclick=async()=>{try{await send(receiverCommand())}catch(error){toast(error.message)}};
+buttons.saveReceiver.onclick=async()=>{try{await send(receiverCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.applyAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);resetAttitude()}catch(error){toast(error.message)}};
 buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);await send("SAVE_SETTINGS");resetAttitude()}catch(error){toast(error.message)}};
 $("#resetAttitudeButton").onclick=resetAttitude;

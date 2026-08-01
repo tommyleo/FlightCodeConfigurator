@@ -76,6 +76,12 @@
       </section>
       <section id="receiverView" class="view">
         <header class="heading"><div><small>INPUT / SBUS</small><h1>Receiver channels</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
+        <article class="receiver-config">
+          <div class="receiver-order"><label for="receiverChannelOrder"><small>CHANNEL MAP</small>First four channels</label><select id="receiverChannelOrder" data-receiver-config disabled><option>TAER1234</option><option>AETR1234</option></select></div>
+          <div id="receiverModes" class="receiver-modes"></div>
+          <div class="receiver-actions"><span id="receiverConfigState">Waiting for board settings</span><button id="applyReceiverConfigButton" class="button secondary" disabled>Apply</button><button id="saveReceiverConfigButton" class="button primary" disabled>Save</button></div>
+        </article>
+        <h2 class="channel-output-title">Live channel output</h2>
         <div id="channelGrid" class="channels"></div>
       </section>
       <section id="pidView" class="view">
