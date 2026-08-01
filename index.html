@@ -183,6 +183,20 @@
           <p>The file records gyroscope, accelerometer, quaternion, displayed angles, and the model CSS matrix at 100 Hz.</p>
           <p>The quad must be disarmed and the motor test must be disabled.</p>
         </article>
+        <article class="imu-diagnostic">
+          <div>
+            <small>STATIONARY CALIBRATION</small>
+            <h2>Measure gyroscope bias and drift</h2>
+            <p id="stationaryDiagnosticInstruction">Keep the board completely still. The test calibrates the gyroscope, waits for stabilization, then records a diagnostic log.</p>
+            <div class="diagnostic-progress"><i id="stationaryDiagnosticProgress"></i></div>
+            <p id="stationaryDiagnosticResult" class="diagnostic-result">Ready to begin.</p>
+          </div>
+          <div class="diagnostic-actions">
+            <button id="startStationaryDiagnosticButton" class="button primary" disabled>Start stationary test</button>
+            <button id="cancelStationaryDiagnosticButton" class="button ghost" disabled>Cancel</button>
+            <button id="downloadStationaryDiagnosticButton" class="button secondary" disabled>Download file</button>
+          </div>
+        </article>
         <article class="pid-diagnostic">
           <div>
             <small>PID / MIXER</small>

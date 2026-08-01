@@ -24,6 +24,8 @@ const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,t
   {key:"combined",axis:"combined",target:null,ms:5000,text:"Prova una posizione combinata libera su roll, pitch e yaw; non servono angoli precisi"},
   {key:"plane_end",axis:"still",target:[0,0,0],ms:3000,text:"Finish with the quad still and level"}
 ]};
+const stationaryDiagnostic={running:false,phase:"idle",phaseStarted:0,sawCalibration:false,samples:[],file:null,
+  settleMs:8000,recordMs:15000,timeoutMs:45000};
 const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,timer:null,aborted:false,abortMessage:"",detected:false,neutralSince:0,stages:[
   {key:"stabile",ms:2000,text:"Keep the quad still with throttle at zero"},
   {key:"feedbackRoll",ms:4000,text:"Sticks centered: manually tilt the quad right and left"},
@@ -97,6 +99,7 @@ function applyCapabilities(){
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
   setCapabilityControls("#motorSafetyCheck","MOTOR_TEST");
   setCapabilityControls("#startImuDiagnosticButton","TELEMETRY");
+  setCapabilityControls("#startStationaryDiagnosticButton","GYRO_CALIBRATION");
   setCapabilityControls("#calibrateGyroButton","GYRO_CALIBRATION");
   setCapabilityControls("#pidDiagnosticSafety","PID_SIM");
   setCapabilityControls("#refreshFlightLogButton","FLIGHT_LOG");
@@ -110,9 +113,13 @@ function applyCapabilities(){
 }
 function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
+function updateConnectionText(){
+  $("#connectionText").textContent=!state.connected?"Board not connected":
+    state.board?`FlightCode connected · ${state.board}`:"FlightCode connected";
+}
 function connected(value){
   state.connected=value;$("#connectionDot").classList.toggle("online",value);$("#deviceDot").classList.toggle("online",value);
-  $("#connectionText").textContent=value?"FlightCode connected":"Board not connected";buttons.connect.textContent=value?"Disconnect":"Connect";
+  updateConnectionText();buttons.connect.textContent=value?"Disconnect":"Connect";
   document.querySelectorAll("[data-pid]").forEach(i=>i.disabled=!value);[buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(b=>b.disabled=!value);
   document.querySelectorAll("[data-rate]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-feedforward]").forEach(i=>i.disabled=!value);
@@ -133,6 +140,7 @@ function connected(value){
   if(!value){$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
+  if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
   if(!value&&pidDiagnostic.running)cancelPidDiagnostic("Check interrupted: board disconnected.");
   applyCapabilities();
 }
@@ -156,13 +164,12 @@ function quaternionRenderMatrix(q){
    * vector for rendering (never for telemetry/PID).
    */
   /*
-   * The CLRacingF4 and MAMBAF411 firmware mappings have opposite visual
-   * pitch handedness after their target-specific IMU alignment.  Protocol
-   * v1 did not report a board name and was MAMBA-only, so an unknown board
-   * intentionally follows the MAMBA path for backward compatibility.
+   * MAMBAF411 uses the opposite visual pitch handedness after its
+   * target-specific IMU alignment. Other boards, including PICO2_W and
+   * CLRACINGF4, use the standard pitch direction.
    */
   const [w,rawX,rawY,rawZ]=q;
-  const x=-rawX,y=state.board==="CLRACINGF4"?rawY:-rawY,z=-rawZ;
+  const x=-rawX,y=state.board==="MAMBAF411"?-rawY:rawY,z=-rawZ;
   const r00=1-2*(y*y+z*z),r01=2*(x*y-w*z),r02=2*(x*z+w*y);
   const r10=2*(x*y+w*z),r11=1-2*(x*x+z*z),r12=2*(y*z-w*x);
   const r20=2*(x*z-w*y),r21=2*(y*z+w*x),r22=1-2*(x*x+y*y);
@@ -260,7 +267,7 @@ function finishImuDiagnostic(){
   clearInterval(imuDiagnostic.timer);imuDiagnostic.timer=null;imuDiagnostic.running=false;
   const summary=diagnosticSummary();
   imuDiagnostic.file={format:"FlightCode-IMU-Diagnostic",version:2,created:new Date().toISOString(),
-    board:"MAMBAF411",alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
+    board:state.board||"UNKNOWN",alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     gravityReference:state.gravityReference?[...state.gravityReference]:null,
     procedure:imuDiagnostic.stages.map(({key,axis,target,ms,text})=>({key,axis,target,ms,text})),
     summary,sampleRateHz:100,samples:imuDiagnostic.samples};
@@ -277,7 +284,7 @@ function advanceImuDiagnostic(){
   imuDiagnostic.stageStarted=performance.now();
 }
 function startImuDiagnostic(){
-  if(!state.connected||state.armed||state.motorTest||pidDiagnostic.running){toast("Disarm the quad and stop the other tests");return}
+  if(!state.connected||state.armed||state.motorTest||pidDiagnostic.running||stationaryDiagnostic.running){toast("Disarm the quad and stop the other tests");return}
   resetAttitude();
   imuDiagnostic.running=true;imuDiagnostic.stage=0;imuDiagnostic.stageStarted=performance.now();imuDiagnostic.samples=[];imuDiagnostic.file=null;
   $("#startImuDiagnosticButton").disabled=true;$("#cancelImuDiagnosticButton").disabled=false;$("#downloadImuDiagnosticButton").disabled=true;
@@ -303,6 +310,114 @@ function downloadImuDiagnostic(){
   const blob=new Blob([JSON.stringify(imuDiagnostic.file,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`FlightCode-IMU-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function stationaryDiagnosticUi(instruction,result,type="",progress=0){
+  $("#stationaryDiagnosticInstruction").textContent=instruction;
+  const out=$("#stationaryDiagnosticResult");out.textContent=result;out.className=`diagnostic-result ${type}`;
+  $("#stationaryDiagnosticProgress").style.width=`${Math.max(0,Math.min(100,progress))}%`;
+}
+function cancelStationaryDiagnostic(message="Stationary test cancelled."){
+  stationaryDiagnostic.running=false;stationaryDiagnostic.phase="idle";
+  $("#startStationaryDiagnosticButton").disabled=!state.connected||!hasCapability("GYRO_CALIBRATION");
+  $("#cancelStationaryDiagnosticButton").disabled=true;
+  stationaryDiagnosticUi("Keep the board completely still during the entire test.",message,"warn",0);
+}
+function vectorStats(rows,key){
+  const values=axis=>rows.map(row=>row[key]?.[axis]).filter(Number.isFinite);
+  const mean=items=>items.length?items.reduce((sum,value)=>sum+value,0)/items.length:0;
+  const result={mean:[],standardDeviation:[],startMean:[],endMean:[],drift:[]};
+  for(let axis=0;axis<3;axis++){
+    const all=values(axis),average=mean(all),window=Math.max(1,Math.floor(all.length*.2));
+    const start=mean(all.slice(0,window)),end=mean(all.slice(-window));
+    result.mean.push(Number(average.toFixed(5)));
+    result.standardDeviation.push(Number(Math.sqrt(mean(all.map(value=>(value-average)**2))).toFixed(5)));
+    result.startMean.push(Number(start.toFixed(5)));result.endMean.push(Number(end.toFixed(5)));
+    result.drift.push(Number((end-start).toFixed(5)));
+  }
+  return result;
+}
+function buildStationaryDiagnosticFile(status,message){
+  const rows=stationaryDiagnostic.samples,recorded=rows.filter(row=>row.phase==="recording");
+  const temperatures=rows.map(row=>row.temperatureC).filter(Number.isFinite);
+  const meanTemperature=temperatures.length?temperatures.reduce((sum,value)=>sum+value,0)/temperatures.length:null;
+  let calibrationResets=0;
+  for(let i=1;i<rows.length;i++)if(rows[i].calibrationSamples<rows[i-1].calibrationSamples)calibrationResets++;
+  const analysisRows=recorded.length?recorded:rows;
+  const summary={status,message,correctedGyro:vectorStats(analysisRows,"gyro"),rawGyro:vectorStats(analysisRows,"rawGyro"),
+    accel:vectorStats(analysisRows,"accel"),temperatureC:meanTemperature===null?null:Number(meanTemperature.toFixed(3)),
+    maximumCalibrationSamples:Math.max(0,...rows.map(row=>row.calibrationSamples)),calibrationResets,
+    durationSeconds:rows.length>1?Number(((rows.at(-1).timestampUs-rows[0].timestampUs)/1e6).toFixed(3)):0,
+    sampleCount:rows.length,recordedSampleCount:recorded.length};
+  stationaryDiagnostic.file={format:"FlightCode-Stationary-Gyro-Diagnostic",version:1,
+    created:new Date().toISOString(),board:state.board||"UNKNOWN",
+    alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
+    settleSeconds:stationaryDiagnostic.settleMs/1000,summary,sampleRateHz:25,samples:rows};
+  return summary;
+}
+function failStationaryDiagnostic(message){
+  stationaryDiagnostic.running=false;stationaryDiagnostic.phase="failed";
+  buildStationaryDiagnosticFile("failed",message);
+  $("#startStationaryDiagnosticButton").disabled=!state.connected;
+  $("#cancelStationaryDiagnosticButton").disabled=true;$("#downloadStationaryDiagnosticButton").disabled=false;
+  stationaryDiagnosticUi("Diagnostic stopped. Download the file to inspect calibration progress.",message,"warn",100);
+}
+function finishStationaryDiagnostic(){
+  stationaryDiagnostic.running=false;stationaryDiagnostic.phase="complete";
+  const summary=buildStationaryDiagnosticFile("complete","Calibration and stationary recording completed.");
+  $("#startStationaryDiagnosticButton").disabled=!state.connected;
+  $("#cancelStationaryDiagnosticButton").disabled=true;$("#downloadStationaryDiagnosticButton").disabled=false;
+  const worst=Math.max(...summary.correctedGyro.mean.map(Math.abs));
+  stationaryDiagnosticUi("Stationary calibration and recording completed.",
+    `Residual gyro offset: ${worst.toFixed(3)} °/s. Download the diagnostic file.`,worst<=.2?"ok":"warn",100);
+}
+async function startStationaryDiagnostic(){
+  if(!state.connected||state.armed||state.motorTest||imuDiagnostic.running||pidDiagnostic.running){
+    toast("Disarm the quad and stop the other tests");return;
+  }
+  Object.assign(stationaryDiagnostic,{running:true,phase:"calibrating",phaseStarted:performance.now(),
+    sawCalibration:false,samples:[],file:null});
+  $("#startStationaryDiagnosticButton").disabled=true;$("#cancelStationaryDiagnosticButton").disabled=false;
+  $("#downloadStationaryDiagnosticButton").disabled=true;
+  stationaryDiagnosticUi("Do not touch the board: gyroscope calibration in progress.","Waiting for calibration…","",5);
+  await send("CALIBRATE_GYRO");
+}
+function recordStationaryDiagnostic(timestamp,gyro,accel,rawGyro,calibrationSamples,temperatureC,calibrated){
+  if(!stationaryDiagnostic.running)return;
+  const now=performance.now(),elapsed=now-stationaryDiagnostic.phaseStarted;
+  stationaryDiagnostic.samples.push({phase:stationaryDiagnostic.phase,timestampUs:timestamp,calibrated,
+    calibrationSamples:Number.isFinite(calibrationSamples)?calibrationSamples:0,
+    gyro:[...gyro],rawGyro:[...rawGyro],accel:[...accel],temperatureC:Number.isFinite(temperatureC)?temperatureC:null});
+  if(stationaryDiagnostic.phase==="calibrating"){
+    if(!calibrated)stationaryDiagnostic.sawCalibration=true;
+    if(stationaryDiagnostic.sawCalibration&&calibrated){
+      stationaryDiagnostic.phase="settling";stationaryDiagnostic.phaseStarted=now;
+      stationaryDiagnosticUi("Calibration completed. Keep the board still while the bias stabilizes.","Stabilizing…","",15);
+    }else if(elapsed>stationaryDiagnostic.timeoutMs)failStationaryDiagnostic("Calibration timed out. Download the diagnostic file.");
+    else stationaryDiagnosticUi("Do not touch the board: gyroscope calibration in progress.",
+      `Valid samples: ${calibrationSamples} / 8000`,"",5+10*Math.min(1,calibrationSamples/8000));
+    return;
+  }
+  const gyroMagnitude=Math.hypot(...gyro),accelNorm=Math.hypot(...accel);
+  if(gyroMagnitude>10||accelNorm<.6||accelNorm>1.4){
+    failStationaryDiagnostic("Movement detected. Download the diagnostic file or restart the test.");return;
+  }
+  if(stationaryDiagnostic.phase==="settling"){
+    stationaryDiagnosticUi("Calibration completed. Keep the board still while the bias stabilizes.",
+      `Stabilizing: ${Math.max(0,(stationaryDiagnostic.settleMs-elapsed)/1000).toFixed(1)} s`,"",15+35*Math.min(1,elapsed/stationaryDiagnostic.settleMs));
+    if(elapsed>=stationaryDiagnostic.settleMs){stationaryDiagnostic.phase="recording";stationaryDiagnostic.phaseStarted=now}
+    return;
+  }
+  if(stationaryDiagnostic.phase==="recording"){
+    stationaryDiagnosticUi("Recording gyro noise and drift. Do not touch the board.",
+      `Recording: ${Math.max(0,(stationaryDiagnostic.recordMs-elapsed)/1000).toFixed(1)} s`,"",50+50*Math.min(1,elapsed/stationaryDiagnostic.recordMs));
+    if(elapsed>=stationaryDiagnostic.recordMs)finishStationaryDiagnostic();
+  }
+}
+function downloadStationaryDiagnostic(){
+  if(!stationaryDiagnostic.file)return;
+  const blob=new Blob([JSON.stringify(stationaryDiagnostic.file,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=`FlightCode-GYRO-STATIONARY-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function pidDiagnosticUi(instruction,result,type="",progress=0){
@@ -356,7 +471,7 @@ function finishPidDiagnostic(){
     loopHz:Number($("#loopFrequency").textContent.replace(/\./g,"").replace(",",".")),
     maxLoopPeriodUs:Number($("#loopMaxPeriod").textContent)};
   pidDiagnostic.file={format:"FlightCode-PID-Mixer-Diagnostic",version:1,created:new Date().toISOString(),
-    board:"MAMBAF411",alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
+    board:state.board||"UNKNOWN",alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:direction,rates:getRates(),feedforward:getFeedforward(),
     summary,sampleRateHz:100,samples:pidDiagnostic.samples};
   $("#cancelPidDiagnosticButton").disabled=true;$("#startPidDiagnosticButton").disabled=!state.connected||!$("#pidDiagnosticSafety").checked;
@@ -367,7 +482,7 @@ function finishPidDiagnostic(){
     ok?"ok":"warn",100);
 }
 async function startPidDiagnostic(){
-  if(!state.connected||state.armed||state.motorTest||imuDiagnostic.running||!$("#pidDiagnosticSafety").checked){
+  if(!state.connected||state.armed||state.motorTest||imuDiagnostic.running||stationaryDiagnostic.running||!$("#pidDiagnosticSafety").checked){
     toast("Disarm the quad, stop the other tests, and confirm that the propellers are removed");return;
   }
   await send("PID_SIM_ENABLE 1");
@@ -479,10 +594,14 @@ function telemetry(parts){
   state.calibrated=calibrated;
   $("#loopFrequency").textContent=Math.round(Number(parts[5])).toLocaleString("en-US");
   $("#loopMaxPeriod").textContent=parts.length>33?Math.round(Number(parts[33])):"—";
-  $("#gyroPitchRaw").textContent=parts.length>34?`RAW: ${Number(parts[34]).toFixed(1)}`:"RAW: —";
+  const rawGyro=parts.length>=37?parts.slice(34,37).map(Number):[NaN,Number(parts[34]),NaN];
+  const calibrationSamples=parts.length>=38?Number(parts[37]):0;
+  const temperatureC=parts.length>=39?Number(parts[38]):NaN;
+  $("#gyroPitchRaw").textContent=Number.isFinite(rawGyro[1])?`RAW: ${rawGyro[1].toFixed(1)}`:"RAW: —";
   const gyro=parts.slice(6,9).map(Number),accel=parts.slice(9,12).map(Number);
   const channelValues=parts.slice(12,28).map(Number),motorValues=parts.slice(28,32).map(Number);
   attitude(timestamp,gyro,accel);recordImuDiagnostic(timestamp,gyro,accel);
+  recordStationaryDiagnostic(timestamp,gyro,accel,rawGyro,calibrationSamples,temperatureC,calibrated);
   recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,motorValues);
   channels(channelValues);motors(motorValues);
   badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
@@ -531,7 +650,7 @@ function line(value){
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="HELLO"){
     if(!["FlightCode","FlightCodePI"].includes(p[2])){toast(`Unrecognized device: ${p[2]||"unknown"}`);return}
-    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();
+    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();updateConnectionText();
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
     if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
     updateMotorProtocolOptions();applyCapabilities();
@@ -639,6 +758,9 @@ $("#calibrateGyroButton").onclick=async()=>{
 $("#startImuDiagnosticButton").onclick=startImuDiagnostic;
 $("#cancelImuDiagnosticButton").onclick=()=>cancelImuDiagnostic();
 $("#downloadImuDiagnosticButton").onclick=downloadImuDiagnostic;
+$("#startStationaryDiagnosticButton").onclick=startStationaryDiagnostic;
+$("#cancelStationaryDiagnosticButton").onclick=()=>cancelStationaryDiagnostic();
+$("#downloadStationaryDiagnosticButton").onclick=downloadStationaryDiagnostic;
 $("#pidDiagnosticSafety").onchange=event=>{
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!event.target.checked||pidDiagnostic.running;
 };
