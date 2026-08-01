@@ -1,6 +1,6 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
 let receiverConfig={order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set()};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set(),osdAvailable:false,osdPosition:"CENTER",osdDirty:false};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -109,6 +109,18 @@ function setCapabilityControls(selector,name){
     element.title=hasCapability(name)?"":"Feature not available on this board";
   });
 }
+function updateOsdControls(){
+  const usable=state.connected&&hasCapability("OSD");
+  $("#osdEnabled").disabled=!usable;
+  document.querySelectorAll("[data-osd-position]").forEach(button=>button.disabled=!usable);
+  $("#applyOsdButton").disabled=!usable;
+  $("#saveOsdButton").disabled=!usable;
+  $("#osdDetectionState").textContent=state.osdAvailable?"MAX7456 DETECTED":"NOT DETECTED";
+}
+function selectOsdPosition(position){
+  state.osdPosition=position;
+  document.querySelectorAll("[data-osd-position]").forEach(button=>button.classList.toggle("active",button.dataset.osdPosition===position));
+}
 function updateMotorProtocolOptions(){
   const values=state.board==="PICO2_W"
     ?[["DSHOT150","DSHOT150"],["DSHOT300","DSHOT300"],["DSHOT600","DSHOT600"]]
@@ -134,6 +146,7 @@ function applyCapabilities(){
   setCapabilityControls("#pidDiagnosticSafety","PID_SIM");
   setCapabilityControls("#refreshFlightLogButton","FLIGHT_LOG");
   setCapabilityControls("#enterDfuButton","DFU");
+  updateOsdControls();
   document.querySelectorAll("[data-tuning-profile]").forEach(element=>{
     element.disabled=!state.connected||!["PIDS","RATES","FEEDFORWARD","TPA"].every(hasCapability);
   });
@@ -146,6 +159,15 @@ function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("
 function updateConnectionText(){
   $("#connectionText").textContent=!state.connected?"Board not connected":
     state.board?`FlightCode connected · ${state.board}`:"FlightCode connected";
+}
+function updateBattery(voltage){
+  const status=$("#batteryStatus");
+  if(!state.connected||!hasCapability("BATTERY_VOLTAGE")||!Number.isFinite(voltage)||voltage<1){status.className="battery-status disabled";$("#batteryVoltage").textContent="— V";$("#batteryFill").style.width="0";status.title=!state.connected?"Board not connected":"Battery voltage not available";return}
+  const cells=Math.max(1,Math.min(8,Math.ceil(voltage/4.25))),cellVoltage=voltage/cells;
+  const percent=Math.max(0,Math.min(100,(cellVoltage-3.3)/.9*100));
+  status.className="battery-status";status.classList.toggle("warning",cellVoltage<3.55&&cellVoltage>=3.35);status.classList.toggle("critical",cellVoltage<3.35);
+  $("#batteryFill").style.width=`${percent}%`;$("#batteryVoltage").textContent=`${voltage.toFixed(2)} V`;
+  status.title=`${cells}S estimated · ${cellVoltage.toFixed(2)} V per cell`;
 }
 function connected(value){
   state.connected=value;$("#connectionDot").classList.toggle("online",value);$("#deviceDot").classList.toggle("online",value);
@@ -167,7 +189,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -175,7 +197,7 @@ function connected(value){
   applyCapabilities();
 }
 function log(line,direction="RX"){
-  if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line==="PING")return;
+  if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG BATTERY_VOLTAGE")||line.startsWith("@CFG SBUS_DIAGNOSTICS")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line==="PING")return;
   const out=$("#consoleOutput");if(!state.count)out.textContent="";out.textContent+=`${new Date().toLocaleTimeString()}  ${direction}  ${line}\n`;out.scrollTop=out.scrollHeight;
   $("#messageCount").textContent=`${++state.count} messages`;
 }
@@ -680,6 +702,18 @@ function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{co
 function line(value){
   log(value);if(!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
   if(p[1]==="TELEMETRY"){telemetry(p);return}
+  if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}
+  if(p[1]==="OSD_STATUS"){
+    const wasAvailable=state.osdAvailable,available=p[2]==="1";state.osdAvailable=available;
+    if(!state.osdDirty){$("#osdEnabled").checked=p[3]==="1";selectOsdPosition(p[4]||"CENTER");$("#osdConfigState").textContent=p[9]==="1"?"Saved to flash":"Unsaved changes"}updateOsdControls();
+    $("#osdDetectionState").textContent=state.osdAvailable?`DETECTED · ${p[6]||"FONT ?"}`:`NOT DETECTED · OSDM 0x${p[7]||"??"}`;
+    $("#osdDetectionState").title=`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
+    if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
+  }
+  if(p[1]==="SBUS_DIAGNOSTICS"&&p.length>=9){
+    const age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
+    $("#receiverState").title=`Frame age: ${age===4294967295?"never":`${age} ms`} · Valid: ${frames} · UART errors: ${errors} · Recoveries: ${recoveries} · Overruns: ${overruns} · Invalid: ${invalid}`;return
+  }
   if(p[1]==="HELLO"){
     if(!["FlightCode","FlightCodePI"].includes(p[2])){toast(`Unrecognized device: ${p[2]||"unknown"}`);return}
     state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();updateConnectionText();
@@ -762,13 +796,28 @@ async function connect(){
   try{state.port=await navigator.serial.requestPort();await state.port.open({baudRate:115200});state.writer=state.port.writable.getWriter();connected(true);state.task=readLoop();state.heartbeat=setInterval(()=>send("PING",false),1000);await send("HELLO")}
   catch(error){toast(error.name==="NotFoundError"?"Connection cancelled":error.message)}
 }
+async function settleWithin(promise,timeoutMs){
+  if(!promise)return;
+  await Promise.race([promise.catch(()=>{}),new Promise(resolve=>setTimeout(resolve,timeoutMs))]);
+}
 async function disconnect(){
   if(state.closing)return;state.closing=true;
-  try{clearInterval(state.heartbeat);clearInterval(state.motorHeartbeat);if(state.writer&&state.motorTest)await send("MOTOR_TEST_ENABLE 0",false);if(state.writer)await send("BYE",false);state.connected=false;if(state.reader)await state.reader.cancel();if(state.task)await state.task;if(state.writer)state.writer.releaseLock();if(state.port)await state.port.close()}
+  const port=state.port,reader=state.reader,writer=state.writer,task=state.task,motorTestActive=state.motorTest;
+  clearInterval(state.heartbeat);clearInterval(state.motorHeartbeat);
+  state.connected=false;connected(false);buttons.connect.disabled=true;buttons.connect.textContent="Disconnecting...";
+  try{
+    if(writer&&motorTestActive)await settleWithin(send("MOTOR_TEST_ENABLE 0",false),250);
+    if(writer)await settleWithin(send("BYE",false),250);
+    if(reader)await settleWithin(reader.cancel(),500);
+    if(task)await settleWithin(task,700);
+    try{writer?.releaseLock()}catch{}
+    try{reader?.releaseLock()}catch{}
+    if(port)await settleWithin(port.close(),700);
+  }
   catch(error){log(`Port closing error: ${error.message}`,"SYS")}
-  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,lastUs:null,calibrated:false,closing:false,board:"",protocol:0,capabilities:new Set()});connected(false)}
+  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,lastUs:null,calibrated:false,closing:false,board:"",protocol:0,capabilities:new Set()});buttons.connect.disabled=false;connected(false)}
 }
-buttons.connect.onclick=()=>state.connected?disconnect():connect();
+buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
 buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
 buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand())}catch(error){toast(error.message)}};
 buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
@@ -781,6 +830,12 @@ buttons.applyMotorIdle.onclick=async()=>{
   await send(`SET_MOTOR_IDLE ${value}`);await send("SAVE_SETTINGS");
 };
 buttons.applyReceiver.onclick=async()=>{try{await send(receiverCommand())}catch(error){toast(error.message)}};
+function osdCommand(){return `SET_OSD ${$("#osdEnabled").checked?1:0} ${state.osdPosition}`}
+function markOsdDirty(){state.osdDirty=true;$("#osdConfigState").textContent="Local changes"}
+document.querySelectorAll("[data-osd-position]").forEach(button=>button.onclick=()=>{selectOsdPosition(button.dataset.osdPosition);markOsdDirty()});
+$("#osdEnabled").onchange=markOsdDirty;
+$("#applyOsdButton").onclick=async()=>{await send(osdCommand());state.osdDirty=false;$("#osdConfigState").textContent="Applied · not saved"};
+$("#saveOsdButton").onclick=async()=>{await send(osdCommand());await send("SAVE_SETTINGS");state.osdDirty=false;$("#osdConfigState").textContent="Saved to flash"};
 buttons.saveReceiver.onclick=async()=>{try{await send(receiverCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.applyAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);resetAttitude()}catch(error){toast(error.message)}};
 buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);await send("SAVE_SETTINGS");resetAttitude()}catch(error){toast(error.message)}};

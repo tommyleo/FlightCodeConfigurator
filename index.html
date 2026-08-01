@@ -13,7 +13,7 @@
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
       <div><b>FlightCode</b><small>CONFIGURATOR</small></div>
     </div>
-    <div class="connection"><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
+    <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
   </header>
   <div class="shell">
@@ -23,7 +23,8 @@
       <button class="nav" data-view="receiver"><span>02</span>Receiver</button>
       <button class="nav" data-view="pid"><span>03</span>PID Tuning</button>
       <button class="nav" data-view="motors"><span>04</span>Motors</button>
-      <button class="nav" data-view="diagnostic"><span>05</span>IMU Diagnostics</button>
+      <button class="nav" data-view="osd"><span>05</span>Camera OSD</button>
+      <button class="nav" data-view="diagnostic"><span>06</span>IMU Diagnostics</button>
       <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b><small id="protocolText">USB serial</small></div></div>
     </aside>
     <main>
@@ -166,6 +167,24 @@
           <div id="motorTestGrid" class="motor-test-grid"></div>
         </article>
         <p class="motor-hint">Return all sliders to zero before disabling the test or disconnecting the battery.</p>
+      </section>
+      <section id="osdView" class="view">
+        <header class="heading"><div><small>VIDEO / MAX7456</small><h1>Camera OSD</h1></div><b id="osdDetectionState" class="badge">NOT DETECTED</b></header>
+        <article class="osd-safety">
+          <strong>REMOVE ALL PROPELLERS</strong>
+          <p>For reliable detection, power the flight controller from the LiPo first, then connect USB. The MAX7456 may not be powered by USB alone.</p>
+        </article>
+        <article class="card osd-card">
+          <header>VOLTAGE OVERLAY <small>MAX7456</small></header>
+          <div class="osd-enable-row"><div><b>Enable voltage overlay</b><small>The firmware applies it when the OSD hardware becomes available.</small></div><label class="osd-switch"><input id="osdEnabled" type="checkbox" disabled><span></span></label></div>
+          <h2 class="osd-position-title">Voltage position</h2>
+          <div id="osdPositions" class="osd-positions" aria-label="Voltage position">
+            <button type="button" data-osd-position="TOP_LEFT" disabled>Top left</button><button type="button" data-osd-position="TOP_CENTER" disabled>Top center</button><button type="button" data-osd-position="TOP_RIGHT" disabled>Top right</button>
+            <button type="button" data-osd-position="CENTER_LEFT" disabled>Center left</button><button type="button" data-osd-position="CENTER" class="active" disabled>Center</button><button type="button" data-osd-position="CENTER_RIGHT" disabled>Center right</button>
+            <button type="button" data-osd-position="BOTTOM_LEFT" disabled>Bottom left</button><button type="button" data-osd-position="BOTTOM_CENTER" disabled>Bottom center</button><button type="button" data-osd-position="BOTTOM_RIGHT" disabled>Bottom right</button>
+          </div>
+          <div class="osd-actions"><span id="osdConfigState">Waiting for board settings</span><button id="applyOsdButton" class="button secondary" disabled>Apply</button><button id="saveOsdButton" class="button primary" disabled>Save</button></div>
+        </article>
       </section>
       <section id="diagnosticView" class="view">
         <header class="heading"><div><small>SENSORS / BENCH ANALYSIS</small><h1>IMU diagnostics</h1></div><b class="badge">NO PROPELLERS</b></header>
