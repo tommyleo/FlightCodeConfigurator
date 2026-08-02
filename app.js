@@ -101,6 +101,20 @@ function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn=
 function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}View`));document.querySelectorAll(".nav").forEach(v=>v.classList.toggle("active",v.dataset.view===name))}
 document.querySelectorAll(".nav").forEach(v=>v.onclick=()=>view(v.dataset.view));
 function badge(el,text,type=""){el.textContent=text;el.className=`badge ${type}`}
+function resetSbusDiagnostics(){
+  $("#sbusDiagnostics").className="sbus-diagnostics waiting";$("#sbusHealth").textContent="WAITING";
+  $("#sbusFrameAge").textContent="—";["sbusValidFrames","sbusUartErrors","sbusRecoveries","sbusOverruns","sbusInvalidFrames"].forEach(id=>$(`#${id}`).textContent="0");
+  $("#sbusDiagnosticMessage").textContent="Waiting for receiver diagnostics…";
+}
+function updateSbusDiagnostics(valid,age,frames,errors,recoveries,overruns,invalid){
+  const issues=errors+overruns+invalid,card=$("#sbusDiagnostics");
+  card.className=`sbus-diagnostics${issues>0?" warning":""}`;
+  $("#sbusHealth").textContent=!valid?"NO SIGNAL":issues>0?"ERRORS DETECTED":"SIGNAL CLEAN";
+  $("#sbusFrameAge").textContent=age===4294967295?"NEVER":`${age} ms`;
+  $("#sbusValidFrames").textContent=frames.toLocaleString();$("#sbusUartErrors").textContent=errors.toLocaleString();
+  $("#sbusRecoveries").textContent=recoveries.toLocaleString();$("#sbusOverruns").textContent=overruns.toLocaleString();$("#sbusInvalidFrames").textContent=invalid.toLocaleString();
+  $("#sbusDiagnosticMessage").textContent=!valid?"No valid SBUS signal.":issues>0?"SBUS errors detected: check signal wire, ground, connector and receiver power.":"No SBUS communication errors detected since startup.";
+}
 function saveState(text,type=""){const el=$("#saveState");el.textContent=text;el.className=`save-state ${type}`}
 function hasCapability(name){return state.capabilities.has(name)}
 function setCapabilityControls(selector,name){
@@ -189,7 +203,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -622,7 +636,7 @@ function startFlightLogDownload(){
 function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
-  const file={format:"FlightCode-Flight-Log",version:1,created:new Date().toISOString(),
+  const file={format:"FlightCode-Flight-Log",version:3,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",sampleRateHz:flightLog.rate,
     alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:$("#motorDirection").value,rates:getRates(),
@@ -711,7 +725,8 @@ function line(value){
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
   }
   if(p[1]==="SBUS_DIAGNOSTICS"&&p.length>=9){
-    const age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
+    const valid=p[2]==="1",age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
+    updateSbusDiagnostics(valid,age,frames,errors,recoveries,overruns,invalid);
     $("#receiverState").title=`Frame age: ${age===4294967295?"never":`${age} ms`} · Valid: ${frames} · UART errors: ${errors} · Recoveries: ${recoveries} · Overruns: ${overruns} · Invalid: ${invalid}`;return
   }
   if(p[1]==="HELLO"){
@@ -751,7 +766,13 @@ function line(value){
     flightLog.records.push({t:Number((index/flightLog.rate).toFixed(5)),
       gyro:n.slice(0,3).map(v=>v/10),setpoint:n.slice(3,6).map(v=>v/10),
       pid:n.slice(6,9).map(v=>v/2),motors:n.slice(9,13).map(v=>Number((v*100/255).toFixed(2))),
-      throttle:n[13]/2,mixerSaturated:(flags&1)!==0,stopReason,loopUs:n[15]});return;
+      throttle:n[13]/2,mixerSaturated:(flags&1)!==0,stopReason,loopUs:n[15],
+      batteryVoltage:n.length>=19?n[16]/100:0,
+      cellVoltage:n.length>=19?n[17]/100:0,
+      batteryCells:n.length>=19?n[18]:0,
+      pTerm:n.length>=28?n.slice(19,22).map(v=>v/2):[0,0,0],
+      iTerm:n.length>=28?n.slice(22,25).map(v=>v/2):[0,0,0],
+      dTerm:n.length>=28?n.slice(25,28).map(v=>v/2):[0,0,0]});return;
   }
   if(p[1]==="FLIGHT_LOG_CHUNK_END"&&flightLog.downloading){
     const next=Number(p[2]);

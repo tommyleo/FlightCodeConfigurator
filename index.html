@@ -82,6 +82,18 @@
           <div id="receiverModes" class="receiver-modes"></div>
           <div class="receiver-actions"><span id="receiverConfigState">Waiting for board settings</span><button id="applyReceiverConfigButton" class="button secondary" disabled>Apply</button><button id="saveReceiverConfigButton" class="button primary" disabled>Save</button></div>
         </article>
+        <article id="sbusDiagnostics" class="sbus-diagnostics waiting">
+          <div class="sbus-diagnostic-heading"><div><small>SBUS DIAGNOSTICS</small><h2>Signal quality</h2></div><b id="sbusHealth">WAITING</b></div>
+          <div class="sbus-diagnostic-grid">
+            <div><small>FRAME AGE</small><strong id="sbusFrameAge">—</strong></div>
+            <div><small>VALID FRAMES</small><strong id="sbusValidFrames">0</strong></div>
+            <div><small>UART ERRORS</small><strong id="sbusUartErrors">0</strong></div>
+            <div><small>RECOVERIES</small><strong id="sbusRecoveries">0</strong></div>
+            <div><small>OVERRUNS</small><strong id="sbusOverruns">0</strong></div>
+            <div><small>INVALID FRAMES</small><strong id="sbusInvalidFrames">0</strong></div>
+          </div>
+          <p id="sbusDiagnosticMessage">Waiting for receiver diagnostics…</p>
+        </article>
         <h2 class="channel-output-title">Live channel output</h2>
         <div id="channelGrid" class="channels"></div>
       </section>
