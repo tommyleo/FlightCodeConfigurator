@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#071016">
   <title>FlightCode Configurator</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="model.css">
+  <link rel="stylesheet" href="blackbox.css">
 </head>
 <body>
   <header class="topbar">
@@ -25,6 +27,7 @@
       <button class="nav" data-view="motors"><span>04</span>Motors</button>
       <button class="nav" data-view="osd"><span>05</span>Camera OSD</button>
       <button class="nav" data-view="diagnostic"><span>06</span>IMU Diagnostics</button>
+      <button class="nav" data-view="blackbox"><span>07</span>Blackbox</button>
       <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b><small id="protocolText">USB serial</small></div></div>
     </aside>
     <main>
@@ -34,13 +37,7 @@
           <div class="setup-visual">
           <article class="model-panel">
             <div class="horizon"></div>
-            <div class="scene"><div class="model-camera"><div id="quadModel" class="quad">
-              <div class="arm a"></div><div class="arm b"></div>
-              <div class="body"><span>F4F</span><i></i></div>
-              <div class="rotor m1"><i></i><b>1</b></div>
-              <div class="rotor m2"><i></i><b>2</b></div>
-              <div class="rotor m3"><i></i><b>3</b></div>
-              <div class="rotor m4"><i></i><b>4</b></div>
+            <div class="scene"><div class="model-camera"><div class="quad-shell"><canvas id="quadModel" class="quad" aria-label="Live 3D quadcopter attitude"></canvas>
               <div class="nose">▲</div>
             </div></div></div>
             <div class="legend"><span>ROLL</span><span>PITCH</span><span>YAW</span></div>
@@ -262,10 +259,25 @@
           </div>
         </article>
       </section>
+      <section id="blackboxView" class="view">
+        <header class="heading"><div><small>STORAGE / MICROSD</small><h1>Blackbox</h1></div><b id="blackboxState" class="badge">UNAVAILABLE</b></header>
+        <article class="card blackbox-card">
+          <header>LONG FLIGHT LOGGING <small>CLRACINGF4</small></header>
+          <div class="osd-enable-row"><div><b>Enable microSD Blackbox</b><small>Records gyro, setpoints, separated P/I/D terms, motors, battery and loop timing at 200 Hz.</small></div><label class="osd-switch"><input id="blackboxEnabled" type="checkbox" disabled><span></span></label></div>
+          <div class="blackbox-stats">
+            <div class="blackbox-stat"><small>CARD CAPACITY</small><strong id="blackboxCapacity">—</strong><span id="blackboxCapacityDetail">microSD storage</span></div>
+            <div class="blackbox-stat"><small>DATA WRITTEN</small><strong id="blackboxWritten">—</strong><span>Current power session</span></div>
+            <div id="blackboxDroppedCard" class="blackbox-stat"><small>DROPPED RECORDS</small><strong id="blackboxDropped">0</strong><span id="blackboxDroppedDetail">Logging pipeline healthy</span></div>
+          </div>
+          <p id="blackboxMessage">Connect a compatible flight controller to check the microSD.</p>
+          <div class="osd-actions"><span id="blackboxConfigState">Waiting for board</span><button id="refreshBlackboxButton" class="button ghost" disabled>Check again</button><button id="applyBlackboxButton" class="button secondary" disabled>Apply</button><button id="saveBlackboxButton" class="button primary" disabled>Save</button></div>
+        </article>
+      </section>
       <details class="console"><summary>Serial communication <span id="messageCount">0 messages</span></summary><pre id="consoleOutput">Device protocol messages will appear here.</pre></details>
     </main>
   </div>
   <div id="toast" class="toast" role="status"></div>
+  <script src="quad-renderer.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
 let receiverConfig={order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set(),osdAvailable:false,osdPosition:"CENTER",osdDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set(),osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -131,6 +131,20 @@ function updateOsdControls(){
   $("#saveOsdButton").disabled=!usable;
   $("#osdDetectionState").textContent=state.osdAvailable?"MAX7456 DETECTED":"NOT DETECTED";
 }
+function formatBytes(bytes){if(bytes<1024)return `${bytes} B`;if(bytes<1048576)return `${(bytes/1024).toFixed(1)} KB`;return `${(bytes/1048576).toFixed(1)} MB`}
+function formatCardCapacity(mebibytes){
+  if(!mebibytes)return {main:"—",detail:"Capacity unavailable"};
+  if(mebibytes>=1024)return {main:`${(mebibytes/1024).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1})} GiB`,detail:`${mebibytes.toLocaleString()} MiB detected`};
+  return {main:`${mebibytes.toLocaleString()} MiB`,detail:"microSD storage"};
+}
+function updateBlackboxControls(){
+  const supported=state.connected&&hasCapability("BLACKBOX_SD"),ready=state.blackboxState==="READY";
+  $("#blackboxEnabled").disabled=!supported||!ready;
+  $("#refreshBlackboxButton").disabled=!supported;
+  $("#applyBlackboxButton").disabled=!supported||!ready;
+  $("#saveBlackboxButton").disabled=!supported||!ready;
+  badge($("#blackboxState"),supported?state.blackboxState:"UNAVAILABLE",ready?"online":state.blackboxState==="RECORDING"?"armed":"");
+}
 function selectOsdPosition(position){
   state.osdPosition=position;
   document.querySelectorAll("[data-osd-position]").forEach(button=>button.classList.toggle("active",button.dataset.osdPosition===position));
@@ -161,6 +175,7 @@ function applyCapabilities(){
   setCapabilityControls("#refreshFlightLogButton","FLIGHT_LOG");
   setCapabilityControls("#enterDfuButton","DFU");
   updateOsdControls();
+  updateBlackboxControls();
   document.querySelectorAll("[data-tuning-profile]").forEach(element=>{
     element.disabled=!state.connected||!["PIDS","RATES","FEEDFORWARD","TPA"].every(hasCapability);
   });
@@ -218,33 +233,33 @@ function log(line,direction="RX"){
 async function send(command,visible=true){if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
 function resetAttitude(){
   state.q=[1,0,0,0];state.angle={roll:0,pitch:0,yaw:0};
-  state.lastUs=null;state.attitudeReady=false;state.gravityReference=null;$("#quadModel").style.transform="";
+  state.lastUs=null;state.attitudeReady=false;state.gravityReference=null;window.quadRenderer?.reset();
 }
 function normalizeQuaternion(q){
   const n=Math.hypot(...q)||1;return q.map(v=>v/n);
 }
 function quaternionRenderMatrix(q){
   /*
-   * The firmware has already applied the configured FC alignment.  CSS uses
-   * the opposite visual handedness in our rear camera, so invert the rotation
-   * vector for rendering (never for telemetry/PID).
+   * Match Betaflight's rear-camera convention:
+   *   model X = -pitch, wrapper Y = -yaw, model Z = -roll.
+   * The SVG is drawn from behind, therefore no additional camera-axis swap is
+   * required.  Keeping the three axes explicit also makes a pure yaw remain
+   * a pure horizontal turn instead of appearing as roll.
    */
-  /*
-   * MAMBAF411 uses the opposite visual pitch handedness after its
-   * target-specific IMU alignment. Other boards, including PICO2_W and
-   * CLRACINGF4, use the standard pitch direction.
-   */
-  const [w,rawX,rawY,rawZ]=q;
-  const x=-rawX,y=state.board==="MAMBAF411"?-rawY:rawY,z=-rawZ;
-  const r00=1-2*(y*y+z*z),r01=2*(x*y-w*z),r02=2*(x*z+w*y);
-  const r10=2*(x*y+w*z),r11=1-2*(x*x+z*z),r12=2*(y*z-w*x);
-  const r20=2*(x*z-w*y),r21=2*(y*z+w*x),r22=1-2*(x*x+y*y);
-  /* The HTML model uses CSS X=pitch, CSS Y=roll and CSS Z=yaw. */
-  const c00=r11,c01=r10,c02=r12,c10=r01,c11=r00,c12=r02,c20=r21,c21=r20,c22=r22;
-  return [c00,c10,c20,0,c01,c11,c21,0,c02,c12,c22,0,0,0,0,1];
+  const [w,x,y,z]=q;
+  const roll=-Math.atan2(2*(w*x+y*z),1-2*(x*x+y*y));
+  const pitch=-Math.asin(Math.max(-1,Math.min(1,2*(w*y-z*x))));
+  const yaw=-Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z));
+  const ca=Math.cos(pitch),sa=Math.sin(pitch);
+  const cb=Math.cos(yaw),sb=Math.sin(yaw);
+  const cc=Math.cos(roll),sc=Math.sin(roll);
+  const r00=cb*cc+sb*sa*sc,r01=-cb*sc+sb*sa*cc,r02=sb*ca;
+  const r10=ca*sc,r11=ca*cc,r12=-sa;
+  const r20=-sb*cc+cb*sa*sc,r21=sb*sc+cb*sa*cc,r22=cb*ca;
+  return [r00,r10,r20,0,r01,r11,r21,0,r02,r12,r22,0,0,0,0,1];
 }
 function renderQuaternion(q){
-  $("#quadModel").style.transform=`matrix3d(${quaternionRenderMatrix(q).join(",")})`;
+  window.quadRenderer?.render(q);
 }
 function attitude(timestamp,gyro,accel){
   let dt=state.lastUs===null?0:(timestamp-state.lastUs)/1e6;state.lastUs=timestamp;
@@ -724,6 +739,19 @@ function line(value){
     $("#osdDetectionState").title=`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
   }
+  if(p[1]==="BLACKBOX_STATUS"){
+    state.blackboxState=p[2]||"ERROR";
+    if(!state.blackboxDirty)$("#blackboxEnabled").checked=p[3]==="1";
+    const capacity=Number(p[4])||0,written=Number(p[5])||0,dropped=Number(p[6])||0;
+    const capacityText=formatCardCapacity(capacity);
+    $("#blackboxCapacity").textContent=capacityText.main;$("#blackboxCapacityDetail").textContent=capacityText.detail;
+    $("#blackboxWritten").textContent=formatBytes(written);$("#blackboxDropped").textContent=dropped.toLocaleString();
+    $("#blackboxDroppedCard").classList.toggle("healthy",dropped===0);$("#blackboxDroppedCard").classList.toggle("warning",dropped>0);
+    $("#blackboxDroppedDetail").textContent=dropped===0?"Logging pipeline healthy":"The microSD could not keep up";
+    $("#blackboxConfigState").textContent=p[7]==="1"?"Saved to flash":"Unsaved changes";
+    $("#blackboxMessage").textContent=state.blackboxState==="READY"?"microSD detected and ready for long flight logs.":state.blackboxState==="RECORDING"?"Recording the current flight.":state.blackboxState==="ABSENT"?"Insert a microSD and select Check again.":state.blackboxState==="ERROR"?"The microSD could not be initialized. Check its contacts, then select Check again.":"Blackbox is not supported by this board.";
+    updateBlackboxControls();return
+  }
   if(p[1]==="SBUS_DIAGNOSTICS"&&p.length>=9){
     const valid=p[2]==="1",age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
     updateSbusDiagnostics(valid,age,frames,errors,recoveries,overruns,invalid);
@@ -737,11 +765,13 @@ function line(value){
     updateMotorProtocolOptions();applyCapabilities();
     $("#deviceName").textContent=`FlightCode · ${state.board}`;$("#protocolText").textContent=`Protocol v${state.protocol}`;view("setup");toast(`${state.board} detected`);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
+    if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);
     return;
   }
   if(p[1]==="CAPABILITIES"){
     state.capabilities=new Set(p.slice(2));updateMotorProtocolOptions();applyCapabilities();
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
+    if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);
     return;
   }
   if(p[1]==="IMU"){
@@ -857,6 +887,11 @@ document.querySelectorAll("[data-osd-position]").forEach(button=>button.onclick=
 $("#osdEnabled").onchange=markOsdDirty;
 $("#applyOsdButton").onclick=async()=>{await send(osdCommand());state.osdDirty=false;$("#osdConfigState").textContent="Applied · not saved"};
 $("#saveOsdButton").onclick=async()=>{await send(osdCommand());await send("SAVE_SETTINGS");state.osdDirty=false;$("#osdConfigState").textContent="Saved to flash"};
+function blackboxCommand(){return `SET_BLACKBOX ${$("#blackboxEnabled").checked?1:0}`}
+$("#blackboxEnabled").onchange=()=>{state.blackboxDirty=true;$("#blackboxConfigState").textContent="Local changes"};
+$("#refreshBlackboxButton").onclick=()=>send("GET_BLACKBOX_STATUS");
+$("#applyBlackboxButton").onclick=async()=>{await send(blackboxCommand());state.blackboxDirty=false;$("#blackboxConfigState").textContent="Applied · not saved"};
+$("#saveBlackboxButton").onclick=async()=>{await send(blackboxCommand());await send("SAVE_SETTINGS");state.blackboxDirty=false;$("#blackboxConfigState").textContent="Saved to flash"};
 buttons.saveReceiver.onclick=async()=>{try{await send(receiverCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.applyAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);resetAttitude()}catch(error){toast(error.message)}};
 buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);await send("SAVE_SETTINGS");resetAttitude()}catch(error){toast(error.message)}};

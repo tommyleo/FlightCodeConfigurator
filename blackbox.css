@@ -1,0 +1,67 @@
+.blackbox-card {
+  width: 100%;
+  max-width: none;
+}
+
+.blackbox-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0 18px;
+}
+
+.blackbox-stat {
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #08151b;
+}
+
+.blackbox-stat small,
+.blackbox-stat span {
+  display: block;
+}
+
+.blackbox-stat small {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1.4px;
+}
+
+.blackbox-stat strong {
+  display: block;
+  margin: 10px 0 7px;
+  color: var(--text);
+  font-size: 27px;
+  line-height: 1;
+}
+
+.blackbox-stat span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.blackbox-stat.healthy strong {
+  color: var(--green);
+}
+
+.blackbox-stat.warning {
+  border-color: #ff8a4266;
+}
+
+.blackbox-stat.warning strong,
+.blackbox-stat.warning span {
+  color: var(--orange);
+}
+
+.blackbox-card > p {
+  color: var(--muted);
+  margin: 20px 0;
+}
+
+@media (max-width: 850px) {
+  .blackbox-stats {
+    grid-template-columns: 1fr;
+  }
+}
