@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="model.css">
   <link rel="stylesheet" href="blackbox.css">
+  <link rel="stylesheet" href="firmware-flasher.css">
 </head>
 <body>
   <header class="topbar">
@@ -28,6 +29,7 @@
       <button class="nav" data-view="osd"><span>05</span>Camera OSD</button>
       <button class="nav" data-view="diagnostic"><span>06</span>IMU Diagnostics</button>
       <button class="nav" data-view="blackbox"><span>07</span>Blackbox</button>
+      <button class="nav" data-view="firmware"><span>08</span>Firmware</button>
       <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b><small id="protocolText">USB serial</small></div></div>
     </aside>
     <main>
@@ -273,11 +275,45 @@
           <div class="osd-actions"><span id="blackboxConfigState">Waiting for board</span><button id="refreshBlackboxButton" class="button ghost" disabled>Check again</button><button id="applyBlackboxButton" class="button secondary" disabled>Apply</button><button id="saveBlackboxButton" class="button primary" disabled>Save</button></div>
         </article>
       </section>
+      <section id="firmwareView" class="view">
+        <header class="heading"><div><small>MAINTENANCE / STM32 DFU</small><h1>Firmware flasher</h1></div><b id="firmwareDfuState" class="badge">WAITING</b></header>
+        <article class="firmware-warning">
+          <strong>STM32 FLIGHT CONTROLLERS ONLY</strong>
+          <p>Use a FlightCode HEX built specifically for the selected board. Keep the LiPo disconnected and do not unplug USB while erasing, writing, or verifying.</p>
+        </article>
+        <article class="firmware-card">
+          <div class="firmware-fields">
+            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option></select></label>
+            <label><small>LOCAL FIRMWARE</small><input id="firmwareFile" type="file" accept=".hex,text/plain"></label>
+          </div>
+          <div class="firmware-file-info">
+            <div><small>FILE</small><strong id="firmwareFileName">No file selected</strong></div>
+            <div><small>FIRMWARE SIZE</small><strong id="firmwareSize">—</strong></div>
+            <div><small>FLASH RANGE</small><strong id="firmwareRange">—</strong></div>
+          </div>
+          <p id="firmwareValidation" class="firmware-validation">Select a FlightCode .hex firmware file.</p>
+          <div class="firmware-sequence">
+            <div><span>1</span><b>Enter DFU</b><small>Use the connected board or its BOOT button.</small></div>
+            <div><span>2</span><b>Connect DFU</b><small>Authorize the STM32 bootloader through USB.</small></div>
+            <div><span>3</span><b>Flash and verify</b><small>Erase application sectors, write, and compare every byte.</small></div>
+          </div>
+          <div class="firmware-actions">
+            <button id="firmwareEnterDfuButton" class="button ghost" disabled>Restart in DFU</button>
+            <button id="firmwareConnectDfuButton" class="button secondary">Connect DFU</button>
+            <button id="firmwareFlashButton" class="button primary" disabled>Flash firmware</button>
+          </div>
+          <label class="firmware-safety"><input id="firmwareSafetyCheck" type="checkbox"> I confirm that the selected firmware matches the physical flight controller and the LiPo is disconnected.</label>
+          <div class="firmware-progress"><i id="firmwareProgress"></i></div>
+          <p id="firmwareProgressText" class="firmware-progress-text">Select a target and firmware file</p>
+          <details class="firmware-log"><summary>Flashing details</summary><pre id="firmwareLog"></pre></details>
+        </article>
+      </section>
       <details class="console"><summary>Serial communication <span id="messageCount">0 messages</span></summary><pre id="consoleOutput">Device protocol messages will appear here.</pre></details>
     </main>
   </div>
   <div id="toast" class="toast" role="status"></div>
   <script src="quad-renderer.js"></script>
   <script src="app.js"></script>
+  <script src="firmware-flasher.js"></script>
 </body>
 </html>

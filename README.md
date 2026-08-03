@@ -16,3 +16,18 @@ PID diagnostics, flight logs, and USB BOOTSEL mode.
 The configurator displays IMU telemetry, 16 SBUS channels, and motor outputs.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
+
+## STM32 firmware flashing
+
+The **Firmware** tab can flash FlightCode Intel HEX builds to MAMBAF411 and
+CLRACINGF4 boards directly from Chrome or Edge through WebUSB:
+
+1. Keep the LiPo disconnected and connect the flight controller by USB.
+2. Select the correct target and its matching `.hex` file.
+3. Restart the connected board in DFU mode, or enter DFU with its BOOT button.
+4. Select **Connect DFU**, confirm the safety check, then select
+   **Flash firmware**.
+
+The configurator validates the HEX target and address range, erases only the
+application sectors, verifies every programmed byte, and then restarts the
+flight controller. The reserved settings and flight-log sectors are preserved.

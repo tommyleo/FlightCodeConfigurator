@@ -183,7 +183,7 @@ function applyCapabilities(){
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
   updateDfuButton();
 }
-function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest}
+function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;window.firmwareFlasher?.updateReady?.()}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
 function updateConnectionText(){
   $("#connectionText").textContent=!state.connected?"Board not connected":
@@ -231,6 +231,16 @@ function log(line,direction="RX"){
   $("#messageCount").textContent=`${++state.count} messages`;
 }
 async function send(command,visible=true){if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
+async function enterDfuMode(){
+  if(!state.connected||!hasCapability("DFU")||state.armed||state.motorTest)throw new Error("DFU requires a connected, disarmed board with motor test disabled");
+  $("#enterDfuButton").disabled=true;
+  await send("ENTER_DFU");
+}
+window.flightCodeConfigurator={
+  board:()=>state.board,
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4"].includes(state.board),
+  enterDfu:enterDfuMode
+};
 function resetAttitude(){
   state.q=[1,0,0,0];state.angle={roll:0,pitch:0,yaw:0};
   state.lastUs=null;state.attitudeReady=false;state.gravityReference=null;window.quadRenderer?.reset();
@@ -762,7 +772,7 @@ function line(value){
     state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();updateConnectionText();
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
     if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
-    updateMotorProtocolOptions();applyCapabilities();
+    updateMotorProtocolOptions();applyCapabilities();window.firmwareFlasher?.setDetectedBoard?.(state.board);
     $("#deviceName").textContent=`FlightCode · ${state.board}`;$("#protocolText").textContent=`Protocol v${state.protocol}`;view("setup");toast(`${state.board} detected`);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);
@@ -917,8 +927,7 @@ $("#refreshFlightLogButton").onclick=()=>send("GET_FLIGHT_LOG_INFO");
 $("#downloadFlightLogButton").onclick=startFlightLogDownload;
 $("#enterDfuButton").onclick=async()=>{
   if(!confirm("Restart the board in DFU mode? The serial connection will be closed."))return;
-  $("#enterDfuButton").disabled=true;
-  await send("ENTER_DFU");
+  await enterDfuMode();
 };
 document.querySelectorAll("[data-pid]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 document.querySelectorAll("[data-rate]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
