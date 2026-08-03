@@ -16,6 +16,19 @@
   color: #cba98f;
 }
 
+.firmware-warning.pico {
+  border-color: #1fd9c666;
+  background: linear-gradient(145deg, #0b2928, #111b1e);
+}
+
+.firmware-warning.pico strong {
+  color: var(--cyan);
+}
+
+.firmware-warning.pico p {
+  color: #91c4c3;
+}
+
 .firmware-card {
   padding: 24px;
   border: 1px solid var(--line);

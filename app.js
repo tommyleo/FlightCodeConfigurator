@@ -232,13 +232,13 @@ function log(line,direction="RX"){
 }
 async function send(command,visible=true){if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
 async function enterDfuMode(){
-  if(!state.connected||!hasCapability("DFU")||state.armed||state.motorTest)throw new Error("DFU requires a connected, disarmed board with motor test disabled");
+  if(!state.connected||!hasCapability("DFU")||state.armed||state.motorTest)throw new Error("Bootloader restart requires a connected, disarmed board with motor test disabled");
   $("#enterDfuButton").disabled=true;
   await send("ENTER_DFU");
 }
 window.flightCodeConfigurator={
   board:()=>state.board,
-  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4"].includes(state.board),
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","PICO2_W"].includes(state.board),
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
@@ -839,7 +839,7 @@ function line(value){
       toast("Motor test enabled");
     }else if(p[2]==="MOTOR_TEST_DISABLED"){
       resetMotorTestUi();toast("Motor test disabled");
-    }else toast(p[2]==="ENTER_DFU"?"Starting DFU mode…":["SAVE_PIDS","SAVE_SETTINGS"].includes(p[2])?"Settings saved to flash":p[2]==="SET_PIDS"?"PIDs applied":"Values updated");
+    }else toast(p[2]==="ENTER_DFU"?"Starting bootloader mode…":["SAVE_PIDS","SAVE_SETTINGS"].includes(p[2])?"Settings saved to flash":p[2]==="SET_PIDS"?"PIDs applied":"Values updated");
   }
   if(p[1]==="ERROR"){
     if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"){resetMotorTestUi();toast("Lower CH6: motor testing requires the quad to be disarmed")}
@@ -926,7 +926,7 @@ $("#downloadPidDiagnosticButton").onclick=downloadPidDiagnostic;
 $("#refreshFlightLogButton").onclick=()=>send("GET_FLIGHT_LOG_INFO");
 $("#downloadFlightLogButton").onclick=startFlightLogDownload;
 $("#enterDfuButton").onclick=async()=>{
-  if(!confirm("Restart the board in DFU mode? The serial connection will be closed."))return;
+  if(!confirm("Restart the board in bootloader mode? The serial connection will be closed."))return;
   await enterDfuMode();
 };
 document.querySelectorAll("[data-pid]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));

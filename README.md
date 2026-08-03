@@ -17,17 +17,22 @@ The configurator displays IMU telemetry, 16 SBUS channels, and motor outputs.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
-## STM32 firmware flashing
+## Firmware flashing
 
-The **Firmware** tab can flash FlightCode Intel HEX builds to MAMBAF411 and
-CLRACINGF4 boards directly from Chrome or Edge through WebUSB:
+The **Firmware** tab detects the connected board and selects its matching
+bootloader and firmware format:
+
+- MAMBAF411 and CLRACINGF4 use STM32 DFU with a FlightCode `.hex` file.
+- Raspberry Pi Pico 2 W uses RP2350 Picoboot with a FlightCodePI `.uf2` file.
+
+Both paths run directly from Chrome or Edge through WebUSB:
 
 1. Keep the LiPo disconnected and connect the flight controller by USB.
-2. Select the correct target and its matching `.hex` file.
-3. Restart the connected board in DFU mode, or enter DFU with its BOOT button.
-4. Select **Connect DFU**, confirm the safety check, then select
+2. Select the correct target and its matching firmware file.
+3. Restart the connected board in DFU or BOOTSEL mode, or use its BOOT button.
+4. Connect the detected bootloader, confirm the safety check, then select
    **Flash firmware**.
 
-The configurator validates the HEX target and address range, erases only the
-application sectors, verifies every programmed byte, and then restarts the
-flight controller. The reserved settings and flight-log sectors are preserved.
+The configurator validates the HEX or UF2 target and address range, erases only
+application memory, verifies every programmed byte, and then restarts the
+flight controller. Reserved settings and flight-log storage are preserved.
