@@ -144,9 +144,18 @@
             <button id="applyProtocolButton" class="button secondary protocol-action" disabled>Apply<br>protocol</button>
           </div>
         </article>
-        <article class="protocol-card">
+        <article class="protocol-card motor-direction-card">
           <div><small>YAW MIXER</small><h2>Motor direction</h2>
             <p>Select reversed for counterclockwise M1/M4 and clockwise M2/M3 (props out).</p></div>
+          <div id="motorDirectionDiagram" class="motor-direction-diagram" role="img" aria-label="Normal motor direction: M1 and M4 clockwise; M2 and M3 counterclockwise">
+            <span class="motor-diagram-nose">FRONT &#9650;</span>
+            <div class="motor-diagram-grid">
+              <span class="motor-diagram-item" data-motor-direction="4"><b>M4</b><i aria-hidden="true">&#8635;</i><small>CW</small></span>
+              <span class="motor-diagram-item" data-motor-direction="2"><b>M2</b><i aria-hidden="true">&#8634;</i><small>CCW</small></span>
+              <span class="motor-diagram-item" data-motor-direction="3"><b>M3</b><i aria-hidden="true">&#8634;</i><small>CCW</small></span>
+              <span class="motor-diagram-item" data-motor-direction="1"><b>M1</b><i aria-hidden="true">&#8635;</i><small>CW</small></span>
+            </div>
+          </div>
           <div class="protocol-control">
             <select id="motorDirection" disabled>
               <option value="NORMAL">Normal · M1/M4 clockwise</option>
@@ -166,7 +175,7 @@
         </article>
         <article class="motor-warning">
           <strong>⚠ REMOVE ALL PROPELLERS</strong>
-          <p>The motors may start immediately. Keep CH6 disarmed and connect the battery only after removing the propellers.</p>
+          <p>The motors may start immediately. Keep the configured ARM switch disabled and connect the battery only after removing the propellers.</p>
           <label><input id="motorSafetyCheck" type="checkbox" disabled> I confirm that all propellers have been removed</label>
         </article>
         <article class="motor-test-panel">
@@ -216,7 +225,7 @@
         <article class="diagnostic-help">
           <h3>How to perform the test</h3>
           <p>Begin with the quad level. Slowly follow each indicated position and hold it until the next stage. The procedure tests ±90° and ±180° on roll, pitch, and yaw, followed by a combined rotation.</p>
-          <p>The file records gyroscope, accelerometer, quaternion, displayed angles, and the model CSS matrix at 100 Hz.</p>
+          <p>The file records gyroscope, accelerometer, quaternion, and displayed angles at 100 Hz.</p>
           <p>The quad must be disarmed and the motor test must be disabled.</p>
         </article>
         <article class="imu-diagnostic">
@@ -313,6 +322,8 @@
   </div>
   <div id="toast" class="toast" role="status"></div>
   <script src="quad-renderer.js"></script>
+  <script src="diagnostic-logic.js"></script>
+  <script src="attitude-logic.js"></script>
   <script src="app.js"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js"></script>

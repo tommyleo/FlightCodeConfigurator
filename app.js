@@ -1,6 +1,6 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
 let receiverConfig={order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,count:0,lastUs:null,calibrated:false,attitudeReady:false,gravityReference:null,q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set(),osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set(),osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -28,13 +28,13 @@ const stationaryDiagnostic={running:false,phase:"idle",phaseStarted:0,sawCalibra
   settleMs:8000,recordMs:15000,timeoutMs:45000};
 const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,timer:null,aborted:false,abortMessage:"",detected:false,neutralSince:0,stages:[
   {key:"stabile",ms:2000,text:"Keep the quad still with throttle at zero"},
+  {key:"throttle50",ms:4000,text:"Raise throttle to about 50%, then return it to zero"},
   {key:"feedbackRoll",ms:4000,text:"Sticks centered: manually tilt the quad right and left"},
   {key:"feedbackPitch",ms:4000,text:"Sticks centered: manually raise and lower the nose"},
   {key:"feedbackYaw",ms:4000,text:"Sticks centered: manually rotate the nose right and left"},
-  {key:"throttle50",ms:4000,text:"Raise throttle to about 50%, then return it to zero"},
-  {key:"commandRoll",ms:4000,text:"Move roll right (CH2 high), then center the stick"},
-  {key:"commandPitch",ms:4000,text:"Move pitch toward CH3 high, then center the stick"},
-  {key:"commandYaw",ms:4000,text:"Move yaw right (CH4 high), then center the stick"}
+  {key:"commandRoll",ms:4000,text:"Move roll right, then center the stick"},
+  {key:"commandPitch",ms:4000,text:"Move pitch nose-down, then center the stick"},
+  {key:"commandYaw",ms:4000,text:"Move yaw right, then center the stick"}
 ]};
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null};
 const tuningProfiles={
@@ -61,12 +61,13 @@ for(let i=0;i<2;i++){
   row.innerHTML=`<select id="modeFunction${i}" data-receiver-config><option>ARM</option><option>BEEP</option></select><select id="modeChannel${i}" data-receiver-config>${Array.from({length:12},(_,n)=>`<option value="${n+5}">AUX${n+1} / CH${n+5}</option>`).join("")}</select><div class="range-wrap"><span id="modeRangeActive${i}" class="range-active"></span><input id="modeMin${i}" data-receiver-config type="range" min="900" max="2100" step="10"><input id="modeMax${i}" data-receiver-config type="range" min="900" max="2100" step="10"><div class="range-ruler">${[900,1100,1300,1500,1700,1900,2100].map(v=>`<span>${v}</span>`).join("")}</div></div><div class="mode-readout"><output id="modeRangeValue${i}"></output><strong id="modeLiveStatus${i}" class="mode-live-status">INACTIVE</strong><small id="modeLiveValue${i}">—</small></div>`;
   $("#receiverModes").append(row);
 }
+const motorPositions=["REAR RIGHT","FRONT RIGHT","REAR LEFT","FRONT LEFT"];
 for(let i=0;i<4;i++){
   const row=document.createElement("div");row.className="motor-row";
-  row.innerHTML=`<span>M${i+1}</span><div class="meter"><i id="motorFill${i}"></i></div><output id="motorValue${i}">0.0</output>`;
+  row.innerHTML=`<span title="${motorPositions[i]}">M${i+1}</span><div class="meter"><i id="motorFill${i}"></i></div><output id="motorValue${i}">0.0</output>`;
   $("#motorOutputs").append(row);
   const test=document.createElement("div");test.className="motor-test-card";
-  test.innerHTML=`<div><strong>M${i+1}</strong><small>MOTORE ${i+1}</small></div><input id="motorTestSlider${i}" class="vertical-motor" type="range" min="0" max="100" step="1" value="0" disabled><output id="motorTestValue${i}">0%</output>`;
+  test.innerHTML=`<div><strong>M${i+1}</strong><small>${motorPositions[i]}</small></div><input id="motorTestSlider${i}" class="vertical-motor" type="range" min="0" max="100" step="1" value="0" disabled><output id="motorTestValue${i}">0%</output>`;
   $("#motorTestGrid").append(test);
 }
 const buttons={connect:$("#connectButton"),read:$("#readButton"),apply:$("#applyButton"),save:$("#saveButton"),reset:$("#resetButton")};
@@ -157,6 +158,23 @@ function updateMotorProtocolOptions(){
   $("#motorProtocol").innerHTML=values.map(([value,label])=>`<option value="${value}">${label}</option>`).join("");
   if(values.some(([value])=>value===selected))$("#motorProtocol").value=selected;
 }
+function updateMotorDirectionDiagram(){
+  const direction=$("#motorDirection").value;
+  const normal=direction!=="REVERSED";
+  document.querySelectorAll("[data-motor-direction]").forEach(item=>{
+    const motor=Number(item.dataset.motorDirection);
+    const clockwise=normal?(motor===1||motor===4):(motor===2||motor===3);
+    item.querySelector("i").textContent=clockwise?"\u21bb":"\u21ba";
+    item.querySelector("small").textContent=clockwise?"CW":"CCW";
+    item.classList.toggle("clockwise",clockwise);
+  });
+  const diagram=$("#motorDirectionDiagram");
+  diagram.setAttribute("aria-label",normal
+    ?"Normal motor direction: M1 and M4 clockwise; M2 and M3 counterclockwise"
+    :"Reversed motor direction: M1 and M4 counterclockwise; M2 and M3 clockwise");
+}
+$("#motorDirection").onchange=updateMotorDirectionDiagram;
+updateMotorDirectionDiagram();
 function applyCapabilities(){
   setCapabilityControls("[data-pid]","PIDS");
   setCapabilityControls("[data-rate]","RATES");
@@ -218,7 +236,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected")}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -242,89 +260,30 @@ window.flightCodeConfigurator={
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
-  state.q=[1,0,0,0];state.angle={roll:0,pitch:0,yaw:0};
-  state.lastUs=null;state.attitudeReady=false;state.gravityReference=null;window.quadRenderer?.reset();
-}
-function normalizeQuaternion(q){
-  const n=Math.hypot(...q)||1;return q.map(v=>v/n);
-}
-function quaternionRenderMatrix(q){
-  /*
-   * Match Betaflight's rear-camera convention:
-   *   model X = -pitch, wrapper Y = -yaw, model Z = -roll.
-   * The SVG is drawn from behind, therefore no additional camera-axis swap is
-   * required.  Keeping the three axes explicit also makes a pure yaw remain
-   * a pure horizontal turn instead of appearing as roll.
-   */
-  const [w,x,y,z]=q;
-  const roll=-Math.atan2(2*(w*x+y*z),1-2*(x*x+y*y));
-  const pitch=-Math.asin(Math.max(-1,Math.min(1,2*(w*y-z*x))));
-  const yaw=-Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z));
-  const ca=Math.cos(pitch),sa=Math.sin(pitch);
-  const cb=Math.cos(yaw),sb=Math.sin(yaw);
-  const cc=Math.cos(roll),sc=Math.sin(roll);
-  const r00=cb*cc+sb*sa*sc,r01=-cb*sc+sb*sa*cc,r02=sb*ca;
-  const r10=ca*sc,r11=ca*cc,r12=-sa;
-  const r20=-sb*cc+cb*sa*sc,r21=sb*sc+cb*sa*cc,r22=cb*ca;
-  return [r00,r10,r20,0,r01,r11,r21,0,r02,r12,r22,0,0,0,0,1];
+  FlightCodeAttitude.reset(state);window.quadRenderer?.reset();
 }
 function renderQuaternion(q){
   window.quadRenderer?.render(q);
 }
-function attitude(timestamp,gyro,accel){
-  let dt=state.lastUs===null?0:(timestamp-state.lastUs)/1e6;state.lastUs=timestamp;
-  dt=Math.max(0,Math.min(.03,dt));
-  const norm=Math.hypot(accel[0],accel[1],accel[2]);
-  if(!state.attitudeReady&&norm>.5){
-    /*
-     * The setup model is relative to the pose in which it was reset.  Keep
-     * that measured gravity vector as the world reference instead of
-     * assuming that the FC itself is mounted perfectly level.
-     */
-    state.gravityReference=accel.map(v=>v/norm);
-    state.q=[1,0,0,0];
-    state.attitudeReady=true;
-  }else if(dt>0&&state.attitudeReady){
-    let [w,x,y,z]=state.q;
-    let gx=gyro[0]*Math.PI/180,gy=gyro[1]*Math.PI/180,gz=gyro[2]*Math.PI/180;
-    if(norm>.75&&norm<1.25){
-      const ax=accel[0]/norm,ay=accel[1]/norm,az=accel[2]/norm;
-      const [grx,gry,grz]=state.gravityReference||[0,0,1];
-      const r00=1-2*(y*y+z*z),r01=2*(x*y-w*z),r02=2*(x*z+w*y);
-      const r10=2*(x*y+w*z),r11=1-2*(x*x+z*z),r12=2*(y*z-w*x);
-      const r20=2*(x*z-w*y),r21=2*(y*z+w*x),r22=1-2*(x*x+y*y);
-      const vx=r00*grx+r10*gry+r20*grz;
-      const vy=r01*grx+r11*gry+r21*grz;
-      const vz=r02*grx+r12*gry+r22*grz;
-      /*
-       * Hand movements add linear/centripetal acceleration, so accelerometer
-       * tilt is trustworthy only when rotation is slow.  Above 40 deg/s the
-       * quaternion follows the gyro alone; near rest gravity quickly removes
-       * the residual roll/pitch error and returns to the reset pose.
-       */
-      const gyroMagnitude=Math.hypot(...gyro);
-      const correction=gyroMagnitude<=8?10:
-        gyroMagnitude>=40?0:10*(40-gyroMagnitude)/32;
-      gx+=correction*(ay*vz-az*vy);
-      gy+=correction*(az*vx-ax*vz);
-      gz+=correction*(ax*vy-ay*vx);
-    }
-    const dw=.5*(-x*gx-y*gy-z*gz),dx=.5*(w*gx+y*gz-z*gy);
-    const dy=.5*(w*gy-z*gx+x*gz),dz=.5*(w*gz+x*gy-y*gx);
-    state.q=normalizeQuaternion([w+dw*dt,x+dx*dt,y+dy*dt,z+dz*dt]);
-  }
-  const [w,x,y,z]=state.q;
-  state.angle.roll=Math.atan2(2*(w*x+y*z),1-2*(x*x+y*y))*180/Math.PI;
-  state.angle.pitch=Math.asin(Math.max(-1,Math.min(1,2*(w*y-z*x))))*180/Math.PI;
-  state.angle.yaw=Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z))*180/Math.PI;
+let latestAttitudeGyro=[0,0,0],latestAttitudeAccel=[0,0,0],attitudeFramePending=false;
+function renderAttitudeFrame(){
+  attitudeFramePending=false;
   renderQuaternion(state.q);
-  $("#gyroRoll").textContent=gyro[0].toFixed(1);$("#gyroPitch").textContent=gyro[1].toFixed(1);$("#gyroYaw").textContent=gyro[2].toFixed(1);
-  $("#accelX").textContent=accel[0].toFixed(2);$("#accelY").textContent=accel[1].toFixed(2);$("#accelZ").textContent=accel[2].toFixed(2);
+  $("#loopFrequency").textContent=state.loopHz.toLocaleString("en-US");
+  $("#loopMaxPeriod").textContent=state.maxLoopPeriodUs||"—";
+  $("#gyroRoll").textContent=latestAttitudeGyro[0].toFixed(1);$("#gyroPitch").textContent=latestAttitudeGyro[1].toFixed(1);$("#gyroYaw").textContent=latestAttitudeGyro[2].toFixed(1);
+  $("#accelX").textContent=latestAttitudeAccel[0].toFixed(2);$("#accelY").textContent=latestAttitudeAccel[1].toFixed(2);$("#accelZ").textContent=latestAttitudeAccel[2].toFixed(2);
   $("#attitudeRoll").textContent=state.angle.roll.toFixed(1);$("#attitudePitch").textContent=state.angle.pitch.toFixed(1);$("#attitudeYaw").textContent=state.angle.yaw.toFixed(1);
+}
+function attitude(timestamp,gyro,accel){
+  FlightCodeAttitude.update(state,timestamp,gyro,accel);
+  latestAttitudeGyro=[...gyro];latestAttitudeAccel=[...accel];
+  if(!attitudeFramePending){attitudeFramePending=true;requestAnimationFrame(renderAttitudeFrame)}
 }
 let pendingChannelValues=null,channelFramePending=false;
 function channels(values){pendingChannelValues=values;if(channelFramePending)return;channelFramePending=true;requestAnimationFrame(()=>{channelFramePending=false;pendingChannelValues.forEach((value,i)=>{const pct=Math.max(0,Math.min(100,(value-900)/12)),mode=receiverConfig.modes.find(m=>m.channel===i+1),active=mode&&value>=mode.min&&value<=mode.max;$(`#channelFill${i}`).style.width=`${pct}%`;$(`#channelFill${i}`).style.background=active?"var(--green)":"var(--cyan)";$(`#channelValue${i}`).textContent=`${Math.round(value)} µs`});receiverConfig.modes.forEach((mode,i)=>{const value=pendingChannelValues[mode.channel-1],active=Number.isFinite(value)&&value>=mode.min&&value<=mode.max,row=$(`#modeFunction${i}`).closest(".receiver-mode");row.classList.toggle("active",active);$(`#modeLiveStatus${i}`).textContent=active?"ACTIVE":"INACTIVE";$(`#modeLiveValue${i}`).textContent=Number.isFinite(value)?`${Math.round(value)} µs live`:"—"})})}
-function motors(values){values.forEach((value,i)=>{$(`#motorFill${i}`).style.width=`${Math.max(0,Math.min(100,value))}%`;$(`#motorValue${i}`).textContent=value.toFixed(1)})}
+let pendingMotorValues=null,motorFramePending=false;
+function motors(values){pendingMotorValues=values;if(motorFramePending)return;motorFramePending=true;requestAnimationFrame(()=>{motorFramePending=false;pendingMotorValues.forEach((value,i)=>{$(`#motorFill${i}`).style.width=`${Math.max(0,Math.min(100,value))}%`;$(`#motorValue${i}`).textContent=value.toFixed(1)})})}
 function diagnosticUi(instruction,result,type="",progress=0){
   $("#imuDiagnosticInstruction").textContent=instruction;
   const out=$("#imuDiagnosticResult");out.textContent=result;out.className=`diagnostic-result ${type}`;
@@ -335,40 +294,20 @@ function cancelImuDiagnostic(message="Check cancelled."){
   $("#startImuDiagnosticButton").disabled=!state.connected;$("#cancelImuDiagnosticButton").disabled=true;
   diagnosticUi("Registra posizioni guidate fino a ±180° e crea un file completo dell’orientamento 3D.",message,"warn",0);
 }
-function diagnosticSummary(){
-  const byStage=key=>imuDiagnostic.samples.filter(s=>s.stage===key);
-  const byAxis=axis=>imuDiagnostic.samples.filter(s=>s.axis===axis);
-  const peak=(rows,index)=>rows.reduce((v,s)=>Math.max(v,Math.abs(s.gyro[index])),0);
-  const stationary=byStage("plane_start");
-  const meanNorm=stationary.length?stationary.reduce((v,s)=>v+Math.hypot(...s.accel),0)/stationary.length:0;
-  const quaternionNormErrors=imuDiagnostic.samples.map(s=>Math.abs(1-Math.hypot(...s.quaternion)));
-  const checks={
-    accelNorm:Number(meanNorm.toFixed(4)),
-    rollPeakDps:Number(peak(byAxis("roll"),0).toFixed(3)),
-    pitchPeakDps:Number(peak(byAxis("pitch"),1).toFixed(3)),
-    yawPeakDps:Number(peak(byAxis("yaw"),2).toFixed(3)),
-    maxQuaternionNormError:Number(Math.max(0,...quaternionNormErrors).toFixed(8)),
-    finalAttitude:imuDiagnostic.samples.at(-1)?.attitude||null
-  };
-  checks.sensorActive=checks.rollPeakDps>5||checks.pitchPeakDps>5||checks.yawPeakDps>5;
-  checks.accelerometerPlausible=checks.accelNorm>.75&&checks.accelNorm<1.25;
-  checks.axesResponsive={roll:checks.rollPeakDps>5,pitch:checks.pitchPeakDps>5,yaw:checks.yawPeakDps>5};
-  return checks;
-}
+function diagnosticSummary(samples=imuDiagnostic.samples){return FlightCodeDiagnosticLogic.imuSummary(samples)}
 function finishImuDiagnostic(){
   clearInterval(imuDiagnostic.timer);imuDiagnostic.timer=null;imuDiagnostic.running=false;
   const summary=diagnosticSummary();
-  imuDiagnostic.file={format:"FlightCode-IMU-Diagnostic",version:2,created:new Date().toISOString(),
+  imuDiagnostic.file={format:"FlightCode-IMU-Diagnostic",version:3,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     gravityReference:state.gravityReference?[...state.gravityReference]:null,
     procedure:imuDiagnostic.stages.map(({key,axis,target,ms,text})=>({key,axis,target,ms,text})),
     summary,sampleRateHz:100,samples:imuDiagnostic.samples};
   $("#startImuDiagnosticButton").disabled=!state.connected;$("#cancelImuDiagnosticButton").disabled=true;
   $("#downloadImuDiagnosticButton").disabled=false;
-  const ok=summary.sensorActive&&summary.accelerometerPlausible&&Object.values(summary.axesResponsive).every(Boolean);
   diagnosticUi("Check completed. Download the file and send it to Codex.",
-    ok?"All axes responded and gravity is plausible.":"An anomaly was detected: the file contains the data needed to identify it.",
-    ok?"ok":"warn",100);
+    summary.ok?"Gyroscope and accelerometer axes, signs, and directions are coherent.":"Axis, sign, or sensor-orientation anomaly detected: inspect the diagnostic file.",
+    summary.ok?"ok":"warn",100);
 }
 function advanceImuDiagnostic(){
   imuDiagnostic.stage++;
@@ -394,8 +333,7 @@ function recordImuDiagnostic(timestamp,gyro,accel){
   const stage=imuDiagnostic.stages[imuDiagnostic.stage];
   imuDiagnostic.samples.push({stage:stage.key,axis:stage.axis,target:stage.target,
     timestampUs:timestamp,gyro,accel,quaternion:[...state.q],
-    attitude:{...state.angle},gravityReference:state.gravityReference?[...state.gravityReference]:null,
-    renderMatrix:quaternionRenderMatrix(state.q)});
+    attitude:{...state.angle},gravityReference:state.gravityReference?[...state.gravityReference]:null});
 }
 function downloadImuDiagnostic(){
   if(!imuDiagnostic.file)return;
@@ -521,7 +459,7 @@ function cancelPidDiagnostic(message="PID check cancelled."){
   clearInterval(pidDiagnostic.timer);pidDiagnostic.timer=null;
   if(pidDiagnostic.running&&state.armed&&state.connected){
     pidDiagnostic.aborted=true;pidDiagnostic.abortMessage=message;pidDiagnostic.stage=pidDiagnostic.stages.length;
-    pidDiagnosticUi("Return throttle to zero and lower CH6.","Physical outputs are still locked: disarm to finish.","warn",100);
+    pidDiagnosticUi("Return throttle to zero and disable the ARM switch.","Physical outputs are still locked: disarm to finish.","warn",100);
     return;
   }
   if(pidDiagnostic.running)send("PID_SIM_ENABLE 0",false);
@@ -530,48 +468,22 @@ function cancelPidDiagnostic(message="PID check cancelled."){
   $("#startPidDiagnosticButton").disabled=!state.connected||!$("#pidDiagnosticSafety").checked;
   pidDiagnosticUi("Check that the PID correctly opposes movement on all three axes.",message,"warn",0);
 }
-function correlation(rows,axis,mix){
-  if(rows.length<2)return 0;
-  const av=rows.reduce((v,s)=>v+s.gyro[axis],0)/rows.length,bv=rows.reduce((v,s)=>v+mix(s.motors),0)/rows.length;
-  let n=0,da=0,db=0;for(const s of rows){const a=s.gyro[axis]-av,b=mix(s.motors)-bv;n+=a*b;da+=a*a;db+=b*b}
-  return da>0&&db>0?n/Math.sqrt(da*db):0;
+function pidDiagnosticSummary(samples,direction,loopHz,maxLoopPeriodUs){
+  return FlightCodeDiagnosticLogic.pidSummary(samples,direction,loopHz,maxLoopPeriodUs);
 }
 function finishPidDiagnostic(){
   clearInterval(pidDiagnostic.timer);pidDiagnostic.timer=null;pidDiagnostic.running=false;
-  const stage=k=>pidDiagnostic.samples.filter(s=>s.stage===k);
-  const mixes=[
-    m=>(-m[0]-m[1]+m[2]+m[3])/4,
-    m=>(m[0]-m[1]+m[2]-m[3])/4,
-    m=>(-m[0]+m[1]+m[2]-m[3])/4
-  ];
   const direction=$("#motorDirection").value;
-  const correlations={
-    roll:Number(correlation(stage("feedbackRoll"),0,mixes[0]).toFixed(3)),
-    pitch:Number(correlation(stage("feedbackPitch"),1,mixes[1]).toFixed(3)),
-    yaw:Number(correlation(stage("feedbackYaw"),2,mixes[2]).toFixed(3))
-  };
-  const expected={roll:correlations.roll<-.2,pitch:correlations.pitch<-.2,
-    yaw:direction==="REVERSED"?correlations.yaw>.2:correlations.yaw<-.2};
-  const maxSpread=Math.max(0,...pidDiagnostic.samples.map(s=>Math.max(...s.motors)-Math.min(...s.motors)));
-  const commandPeak={
-    throttleAverage:Number(Math.max(0,...stage("throttle50").map(s=>s.motors.reduce((a,b)=>a+b,0)/4)).toFixed(2)),
-    roll:Number(Math.max(0,...stage("commandRoll").map(s=>mixes[0](s.motors))).toFixed(2)),
-    pitch:Number(Math.max(0,...stage("commandPitch").map(s=>mixes[1](s.motors))).toFixed(2)),
-    yaw:Number(Math.max(0,...stage("commandYaw").map(s=>Math.abs(mixes[2](s.motors)))).toFixed(2))
-  };
-  const summary={correlations,expectedOpposition:expected,commandPeak,maxMotorSpreadPercent:Number(maxSpread.toFixed(2)),
-    loopHz:Number($("#loopFrequency").textContent.replace(/\./g,"").replace(",",".")),
-    maxLoopPeriodUs:Number($("#loopMaxPeriod").textContent)};
-  pidDiagnostic.file={format:"FlightCode-PID-Mixer-Diagnostic",version:1,created:new Date().toISOString(),
+  const summary=pidDiagnosticSummary(pidDiagnostic.samples,direction,state.loopHz,state.maxLoopPeriodUs);
+  pidDiagnostic.file={format:"FlightCode-PID-Mixer-Diagnostic",version:2,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:direction,rates:getRates(),feedforward:getFeedforward(),
     summary,sampleRateHz:100,samples:pidDiagnostic.samples};
   $("#cancelPidDiagnosticButton").disabled=true;$("#startPidDiagnosticButton").disabled=!state.connected||!$("#pidDiagnosticSafety").checked;
   $("#downloadPidDiagnosticButton").disabled=false;
-  const ok=Object.values(expected).every(Boolean)&&maxSpread>1;
   pidDiagnosticUi("Simulation completed: physical outputs remained at zero throughout.",
-    ok?"All three PID responses have the expected direction.":"One or more responses require inspection in the file.",
-    ok?"ok":"warn",100);
+    summary.ok?"PID feedback and radio commands match the universal Quad X mixer.":"A feedback direction, mixer output, or radio command requires inspection.",
+    summary.ok?"ok":"warn",100);
 }
 async function startPidDiagnostic(){
   if(!state.connected||state.armed||state.motorTest||imuDiagnostic.running||stationaryDiagnostic.running||!$("#pidDiagnosticSafety").checked){
@@ -580,12 +492,12 @@ async function startPidDiagnostic(){
   await send("PID_SIM_ENABLE 1");
   pidDiagnostic.running=true;pidDiagnostic.stage=-1;pidDiagnostic.samples=[];pidDiagnostic.file=null;pidDiagnostic.aborted=false;pidDiagnostic.abortMessage="";pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;
   $("#startPidDiagnosticButton").disabled=true;$("#cancelPidDiagnosticButton").disabled=false;$("#downloadPidDiagnosticButton").disabled=true;
-  pidDiagnosticUi("Set throttle to zero, then arm with CH6.","Waiting for arming…","",0);
+  pidDiagnosticUi("Set throttle to zero, then enable the configured ARM switch.","Waiting for arming…","",0);
 }
 function beginPidStage(index){
   pidDiagnostic.stage=index;pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.stageStarted=performance.now();
   if(index>=pidDiagnostic.stages.length){
-    pidDiagnosticUi("Center all sticks, set throttle to zero, and lower CH6.","Waiting for disarm to end the simulation…","",100);
+    pidDiagnosticUi("Center all sticks, set throttle to zero, and disable the ARM switch.","Waiting for disarm to end the simulation…","",100);
     return;
   }
   if(index>0)send("PID_SIM_RESET",false);
@@ -602,11 +514,12 @@ function updatePidStage(gyro,channelValues){
     return;
   }
   const axis=key==="feedbackRoll"?0:key==="feedbackPitch"?1:key==="feedbackYaw"?2:-1;
-  const commandChannel=key==="throttle50"?0:key==="commandRoll"?1:key==="commandPitch"?2:key==="commandYaw"?3:-1;
+  const channelIndex=receiverChannelIndex();
+  const commandChannel=key==="throttle50"?channelIndex.throttle:key==="commandRoll"?channelIndex.roll:key==="commandPitch"?channelIndex.pitch:key==="commandYaw"?channelIndex.yaw:-1;
   const active=axis>=0?Math.abs(gyro[axis])>30:
-    key==="throttle50"?(channelValues[0]>=1400&&channelValues[0]<=1600):channelValues[commandChannel]>1800;
+    key==="throttle50"?(channelValues[commandChannel]>=1400&&channelValues[commandChannel]<=1600):channelValues[commandChannel]>1800;
   const neutral=axis>=0?Math.abs(gyro[axis])<5:
-    key==="throttle50"?channelValues[0]<1100:Math.abs(channelValues[commandChannel]-1500)<80;
+    key==="throttle50"?channelValues[commandChannel]<1100:Math.abs(channelValues[commandChannel]-1500)<80;
   if(!pidDiagnostic.detected&&active){
     pidDiagnostic.detected=true;pidDiagnostic.neutralSince=0;
     const back=axis>=0?"Now hold the quad still.":key==="throttle50"?"Now return throttle to zero.":"Now center the stick.";
@@ -619,6 +532,9 @@ function updatePidStage(gyro,channelValues){
       if(now-pidDiagnostic.neutralSince>=500)beginPidStage(pidDiagnostic.stage+1);
     }else pidDiagnostic.neutralSince=0;
   }
+}
+function receiverChannelIndex(order=receiverConfig.order){
+  return FlightCodeDiagnosticLogic.receiverChannelIndex(order);
 }
 function recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,motorValues){
   if(!pidDiagnostic.running)return;
@@ -677,15 +593,16 @@ function finishFlightLogDownload(){
 function telemetry(parts){
   if(parts.length<32)return;const timestamp=Number(parts[2]),signal=parts[3]==="1",armed=parts[4]==="1";
   const calibrated=parts[32]==="1";
-  const wasArmed=state.armed;
-  state.armed=armed;updateDfuButton();
+  const wasArmed=state.armed,wasCalibrated=state.calibrated,wasSignal=state.signal,firstTelemetry=!state.telemetrySeen;
+  state.armed=armed;state.signal=signal;state.telemetrySeen=true;
+  if(firstTelemetry||wasArmed!==armed)updateDfuButton();
   if(wasArmed&&!armed)setTimeout(()=>send("GET_FLIGHT_LOG_INFO",false),100);
   if(calibrated&&!state.calibrated){
     resetAttitude();toast("Gyroscope calibration completed");
   }
   state.calibrated=calibrated;
-  $("#loopFrequency").textContent=Math.round(Number(parts[5])).toLocaleString("en-US");
-  $("#loopMaxPeriod").textContent=parts.length>33?Math.round(Number(parts[33])):"—";
+  state.loopHz=Math.round(Number(parts[5]))||0;
+  state.maxLoopPeriodUs=parts.length>33?(Math.round(Number(parts[33]))||0):0;
   const rawGyro=parts.length>=37?parts.slice(34,37).map(Number):[NaN,Number(parts[34]),NaN];
   const calibrationSamples=parts.length>=38?Number(parts[37]):0;
   const temperatureC=parts.length>=39?Number(parts[38]):NaN;
@@ -697,8 +614,8 @@ function telemetry(parts){
   recordStationaryDiagnostic(timestamp,gyro,accel,rawGyro,calibrationSamples,temperatureC,calibrated);
   recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,motorValues);
   channels(channelValues);motors(motorValues);
-  badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
-  badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRATING",armed?"armed":calibrated?"online":"");
+  if(firstTelemetry||wasSignal!==signal)badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
+  if(firstTelemetry||wasArmed!==armed||wasCalibrated!==calibrated)badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRATING",armed?"armed":calibrated?"online":"");
 }
 function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>$(`#${key}${term}`).value=Number(values[i++]).toFixed(4)))}
 function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value);if(!Number.isFinite(value)||value<0||value>1000)throw new Error(`Invalid ${label} ${term} value`);return value}))}
@@ -830,7 +747,7 @@ function line(value){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
     $("#motorProtocol").value=p[2];return;
   }
-  if(p[1]==="MOTOR_DIRECTION"){if(["NORMAL","REVERSED"].includes(p[2]))$("#motorDirection").value=p[2];return}
+  if(p[1]==="MOTOR_DIRECTION"){if(["NORMAL","REVERSED"].includes(p[2])){$("#motorDirection").value=p[2];updateMotorDirectionDiagram()}return}
   if(p[1]==="MOTOR_IDLE"){const value=Number(p[2]);if(Number.isFinite(value))$("#motorIdlePercent").value=value.toFixed(1);return}
   if(p[1]==="OK"){
     if(p[2]==="MOTOR_TEST_ENABLED"){
@@ -842,7 +759,7 @@ function line(value){
     }else toast(p[2]==="ENTER_DFU"?"Starting bootloader mode…":["SAVE_PIDS","SAVE_SETTINGS"].includes(p[2])?"Settings saved to flash":p[2]==="SET_PIDS"?"PIDs applied":"Values updated");
   }
   if(p[1]==="ERROR"){
-    if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"){resetMotorTestUi();toast("Lower CH6: motor testing requires the quad to be disarmed")}
+    if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"){resetMotorTestUi();toast("Disable the configured ARM switch before motor testing")}
     else if(p[2]==="MOTOR_TEST_DISABLED"){resetMotorTestUi();toast("Motor test interrupted: enable it again")}
     else toast(`Board error: ${p.slice(2).join(" ")}`);
   }
@@ -876,7 +793,7 @@ async function disconnect(){
     if(port)await settleWithin(port.close(),700);
   }
   catch(error){log(`Port closing error: ${error.message}`,"SYS")}
-  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,lastUs:null,calibrated:false,closing:false,board:"",protocol:0,capabilities:new Set()});buttons.connect.disabled=false;connected(false)}
+  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});buttons.connect.disabled=false;connected(false)}
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
 buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
