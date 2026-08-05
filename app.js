@@ -38,9 +38,9 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,
 ]};
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null};
 const tuningProfiles={
-  balanced:{label:"BALANCED",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],rates:[540,540,410],expo:.35,ff:[.025,.025,.015],tpa:[0,65]},
-  racing:{label:"RACING",pids:[.1005,.2,.0013,.1005,.2,.0013,.155,.25,0],rates:[420,420,320],expo:.30,ff:[.025,.025,.015],tpa:[20,70]},
-  freestyle:{label:"FREESTYLE",pids:[.09,.22,.0014,.09,.22,.0014,.12,.22,0],rates:[650,650,500],expo:.35,ff:[.025,.025,.015],tpa:[0,65]}
+  balanced:{label:"BALANCED",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],rates:[540,540,410],expo:.35,ff:[.025,.025,.015],tpa:[0,65],filters:[100,60]},
+  racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,320],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[100,60]},
+  freestyle:{label:"FREESTYLE",pids:[.09,.22,.0014,.09,.22,.0014,.12,.22,0],rates:[650,650,500],expo:.35,ff:[.025,.025,.015],tpa:[0,65],filters:[100,60]}
 };
 const $=s=>document.querySelector(s);
 
@@ -180,6 +180,7 @@ function applyCapabilities(){
   setCapabilityControls("[data-rate]","RATES");
   setCapabilityControls("[data-feedforward]","FEEDFORWARD");
   setCapabilityControls("[data-tpa]","TPA");
+  setCapabilityControls("[data-filter]","FILTERS");
   setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
@@ -195,7 +196,7 @@ function applyCapabilities(){
   updateOsdControls();
   updateBlackboxControls();
   document.querySelectorAll("[data-tuning-profile]").forEach(element=>{
-    element.disabled=!state.connected||!["PIDS","RATES","FEEDFORWARD","TPA"].every(hasCapability);
+    element.disabled=!state.connected||!["PIDS","RATES","FEEDFORWARD","TPA","FILTERS"].every(hasCapability);
   });
   [buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(element=>element.disabled=!state.connected||!hasCapability("PIDS"));
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
@@ -223,6 +224,7 @@ function connected(value){
   document.querySelectorAll("[data-rate]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-feedforward]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-tpa]").forEach(i=>i.disabled=!value);
+  document.querySelectorAll("[data-filter]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-tuning-profile]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-alignment]").forEach(i=>i.disabled=!value);buttons.applyAlignment.disabled=!value;buttons.saveAlignment.disabled=!value;
   $("#motorProtocol").disabled=!value;buttons.applyProtocol.disabled=!value;
@@ -585,6 +587,7 @@ function finishFlightLogDownload(){
     pids:getPids(),tpa:getTpa(),stopReason:last?.stopReason||"UNKNOWN",
     receiverDiagnostics:flightLog.receiverDiagnostics,
     samples:flightLog.records};
+  if(hasCapability("FILTERS"))file.filters=getFilters();
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`FlightCode-FLIGHT-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -594,12 +597,11 @@ function telemetry(parts){
   if(parts.length<32)return;const timestamp=Number(parts[2]),signal=parts[3]==="1",armed=parts[4]==="1";
   const calibrated=parts[32]==="1";
   const wasArmed=state.armed,wasCalibrated=state.calibrated,wasSignal=state.signal,firstTelemetry=!state.telemetrySeen;
+  if(firstTelemetry)resetAttitude();
   state.armed=armed;state.signal=signal;state.telemetrySeen=true;
   if(firstTelemetry||wasArmed!==armed)updateDfuButton();
   if(wasArmed&&!armed)setTimeout(()=>send("GET_FLIGHT_LOG_INFO",false),100);
-  if(calibrated&&!state.calibrated){
-    resetAttitude();toast("Gyroscope calibration completed");
-  }
+  if(!firstTelemetry&&calibrated&&!wasCalibrated)toast("Gyroscope calibration completed");
   state.calibrated=calibrated;
   state.loopHz=Math.round(Number(parts[5]))||0;
   state.maxLoopPeriodUs=parts.length>33?(Math.round(Number(parts[33]))||0):0;
@@ -641,18 +643,27 @@ function getTpa(){
   return {attenuation,breakpoint};
 }
 function tpaCommand(){const t=getTpa();return `SET_TPA ${t.attenuation/100} ${t.breakpoint}`}
+function setFilters(values){$("#gyroLpfHz").value=Number(values[0]).toFixed(0);$("#dtermLpfHz").value=Number(values[1]).toFixed(0)}
+function getFilters(){
+  const gyro=Number($("#gyroLpfHz").value),dterm=Number($("#dtermLpfHz").value);
+  if(!Number.isFinite(gyro)||gyro<50||gyro>250)throw new Error("Gyro low-pass must be between 50 and 250 Hz");
+  if(!Number.isFinite(dterm)||dterm<20||dterm>200)throw new Error("D-term low-pass must be between 20 and 200 Hz");
+  if(dterm>gyro)throw new Error("D-term low-pass cannot exceed the gyro low-pass");
+  return {gyro,dterm};
+}
+function filtersCommand(){const f=getFilters();return `SET_FILTERS ${f.gyro} ${f.dterm}`}
 function setActiveTuningProfile(name){
   document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.classList.toggle("active",button.dataset.tuningProfile===name));
   $("#activeTuningProfile").textContent=name&&tuningProfiles[name]?tuningProfiles[name].label:"CUSTOM";
 }
 function applyTuningProfile(name){
   const profile=tuningProfiles[name];if(!profile||!state.connected)return;
-  setPids(profile.pids);if(profile.rates)setRates([...profile.rates,profile.expo]);else $("#rateExpo").value=profile.expo.toFixed(2);setFeedforward(profile.ff);setTpa(profile.tpa);
+  setPids(profile.pids);if(profile.rates)setRates([...profile.rates,profile.expo]);else $("#rateExpo").value=profile.expo.toFixed(2);setFeedforward(profile.ff);setTpa(profile.tpa);if(profile.filters)setFilters(profile.filters);
   setActiveTuningProfile(name);saveState("Preset ready to apply","dirty");
   toast(`${profile.label} profile loaded: select Apply or Save`);
 }
 document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.onclick=()=>applyTuningProfile(button.dataset.tuningProfile));
-document.querySelectorAll("[data-pid],[data-rate],[data-feedforward],[data-tpa]").forEach(input=>input.addEventListener("input",()=>setActiveTuningProfile(null)));
+document.querySelectorAll("[data-pid],[data-rate],[data-feedforward],[data-tpa],[data-filter]").forEach(input=>input.addEventListener("input",()=>setActiveTuningProfile(null)));
 function setAlignment(values){$("#boardRoll").value=Number(values[0]).toFixed(1);$("#boardPitch").value=Number(values[1]).toFixed(1);$("#boardYaw").value=Number(values[2]).toFixed(1)}
 function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{const value=Number($(`#${id}`).value);if(!Number.isFinite(value)||value < -180||value > 180)throw new Error("Gli angoli devono essere compresi tra -180° e +180°");return value})}
 function line(value){
@@ -741,6 +752,7 @@ function line(value){
   if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
+  if(p[1]==="FILTERS"&&p.length>=5){setFilters(p.slice(2,4));saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
   if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="MOTOR_PROTOCOL"){
@@ -771,7 +783,7 @@ async function readLoop(){
 }
 async function connect(){
   if(!("serial"in navigator)){toast("Use Chrome or Edge: Web Serial is not available");return}
-  try{state.port=await navigator.serial.requestPort();await state.port.open({baudRate:115200});state.writer=state.port.writable.getWriter();connected(true);state.task=readLoop();state.heartbeat=setInterval(()=>send("PING",false),1000);await send("HELLO")}
+  try{state.port=await navigator.serial.requestPort();await state.port.open({baudRate:115200});state.writer=state.port.writable.getWriter();resetAttitude();connected(true);state.task=readLoop();state.heartbeat=setInterval(()=>send("PING",false),1000);await send("HELLO")}
   catch(error){toast(error.name==="NotFoundError"?"Connection cancelled":error.message)}
 }
 async function settleWithin(promise,timeoutMs){
@@ -793,12 +805,12 @@ async function disconnect(){
     if(port)await settleWithin(port.close(),700);
   }
   catch(error){log(`Port closing error: ${error.message}`,"SYS")}
-  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});buttons.connect.disabled=false;connected(false)}
+  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
-buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
-buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand())}catch(error){toast(error.message)}};
-buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
+buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
+buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand())}catch(error){toast(error.message)}};
+buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorDirection.onclick=async()=>{await send(`SET_MOTOR_DIRECTION ${$("#motorDirection").value}`);await send("SAVE_SETTINGS")};
@@ -849,6 +861,7 @@ $("#enterDfuButton").onclick=async()=>{
 document.querySelectorAll("[data-pid]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 document.querySelectorAll("[data-rate]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 document.querySelectorAll("[data-feedforward]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
+document.querySelectorAll("[data-filter]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 document.querySelectorAll("[data-alignment]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 navigator.serial?.addEventListener("disconnect",()=>disconnect());connected(false);
 

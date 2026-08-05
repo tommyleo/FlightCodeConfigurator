@@ -4,15 +4,8 @@
   const cameraYaw=0,cameraElevation=.16,cameraDistance=6.4,focal=6.8;
   let lastQuaternion=[1,0,0,0];
 
-  const rotate=(p,roll,pitch,yaw)=>{
-    let [x,y,z]=p;
-    /* Aircraft axes: roll around forward Y, pitch around right X, yaw around up Z. */
-    let c=Math.cos(roll),s=Math.sin(roll);[x,z]=[c*x+s*z,-s*x+c*z];
-    c=Math.cos(pitch);s=Math.sin(pitch);[y,z]=[c*y-s*z,s*y+c*z];
-    c=Math.cos(yaw);s=Math.sin(yaw);return [c*x-s*y,s*x+c*y,z];
-  };
-  const project=(p,w,h,angles)=>{
-    let [x,y,z]=rotate(p,...angles),c=Math.cos(cameraYaw),s=Math.sin(cameraYaw);
+  const project=(p,w,h,q)=>{
+    let [x,y,z]=FlightCodeQuadMath.rotateSceneVector(p,q),c=Math.cos(cameraYaw),s=Math.sin(cameraYaw);
     [x,y]=[c*x-s*y,s*x+c*y];
     c=Math.cos(cameraElevation);s=Math.sin(cameraElevation);
     const vy=c*y+s*z,vz=-s*y+c*z,scale=focal/(cameraDistance+vy);
@@ -75,19 +68,12 @@
       canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);
-    const [qw,qx,qy,qz]=q;
-    /* Axis directions verified against the physical FC in the rear view. */
-    const angles=[
-      Math.atan2(2*(qw*qx+qy*qz),1-2*(qx*qx+qy*qy)),
-      Math.asin(Math.max(-1,Math.min(1,2*(qw*qy-qz*qx)))),
-      -Math.atan2(2*(qw*qz+qx*qy),1-2*(qy*qy+qz*qz))
-    ];
-    const rendered=model.faces.map(f=>{const p=f.points.map(v=>project(v,rect.width,rect.height,angles));return {...f,p,depth:p.reduce((n,v)=>n+v.depth,0)/p.length};}).sort((a,b)=>b.depth-a.depth);
+    const rendered=model.faces.map(f=>{const p=f.points.map(v=>project(v,rect.width,rect.height,q));return {...f,p,depth:p.reduce((n,v)=>n+v.depth,0)/p.length};}).sort((a,b)=>b.depth-a.depth);
     rendered.forEach(f=>{ctx.beginPath();ctx.moveTo(f.p[0].x,f.p[0].y);f.p.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.fillStyle=f.fill;ctx.fill();ctx.strokeStyle=f.stroke;ctx.lineWidth=f.width;ctx.stroke();});
     ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="800 11px monospace";
-    model.motors.forEach(([x,y,label])=>{const p=project([x,y,.28],rect.width,rect.height,angles);ctx.fillStyle="#0a171c";ctx.fillText(label,p.x,p.y);});
-    const fc=project([0,0,.23],rect.width,rect.height,angles);ctx.fillStyle="#eaffff";ctx.font="900 15px monospace";ctx.fillText("FC",fc.x,fc.y);
-    const nose=project([0,.92,.26],rect.width,rect.height,angles);ctx.fillStyle="#ff8a42";ctx.beginPath();ctx.arc(nose.x,nose.y,3.5,0,Math.PI*2);ctx.fill();
+    model.motors.forEach(([x,y,label])=>{const p=project([x,y,.28],rect.width,rect.height,q);ctx.fillStyle="#0a171c";ctx.fillText(label,p.x,p.y);});
+    const fc=project([0,0,.23],rect.width,rect.height,q);ctx.fillStyle="#eaffff";ctx.font="900 15px monospace";ctx.fillText("FC",fc.x,fc.y);
+    const nose=project([0,.92,.26],rect.width,rect.height,q);ctx.fillStyle="#ff8a42";ctx.beginPath();ctx.arc(nose.x,nose.y,3.5,0,Math.PI*2);ctx.fill();
   }
   window.addEventListener("resize",()=>draw());
   window.quadRenderer={render:draw,reset:()=>draw([1,0,0,0])};

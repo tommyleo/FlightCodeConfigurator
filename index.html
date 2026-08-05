@@ -102,7 +102,7 @@
           <div>
             <small>FLIGHT PROFILE</small>
             <h2>Quick tuning</h2>
-            <p>Presets fill in PID, expo, and feedforward values. Review them, then select Apply or Save to flash.</p>
+            <p>Presets fill in PID, rates, feedforward, TPA, and filter values. Review them, then select Apply or Save to flash.</p>
           </div>
           <div class="profile-buttons">
             <button class="profile-button" data-tuning-profile="balanced" disabled><b>Balanced</b><small>Predictable and progressive</small></button>
@@ -116,12 +116,20 @@
           <header><div><small>STICK RESPONSE</small><h2>Rates and expo</h2></div>
             <p>Expo softens the stick center while preserving maximum rate at the endpoints.</p></header>
           <div class="rates-fields">
-            <label>Roll max <span>°/s</span><input id="rollRate" data-rate type="number" min="100" max="1200" step="10" value="500" disabled></label>
-            <label>Pitch max <span>°/s</span><input id="pitchRate" data-rate type="number" min="100" max="1200" step="10" value="500" disabled></label>
-            <label>Yaw max <span>°/s</span><input id="yawRate" data-rate type="number" min="100" max="1200" step="10" value="400" disabled></label>
-            <label>Expo <span>0–0,9</span><input id="rateExpo" data-rate type="number" min="0" max="0.9" step="0.01" value="0.35" disabled></label>
-            <label>TPA <span>%</span><input id="tpaAttenuation" data-tpa type="number" min="0" max="100" step="1" value="0" disabled></label>
-            <label>TPA breakpoint <span>throttle %</span><input id="tpaBreakpoint" data-tpa type="number" min="0" max="100" step="1" value="65" disabled></label>
+            <label>Roll max <span>°/s</span><input id="rollRate" data-rate type="number" min="100" max="1200" step="10" value="420" disabled></label>
+            <label>Pitch max <span>°/s</span><input id="pitchRate" data-rate type="number" min="100" max="1200" step="10" value="420" disabled></label>
+            <label>Yaw max <span>°/s</span><input id="yawRate" data-rate type="number" min="100" max="1200" step="10" value="320" disabled></label>
+            <label>Expo <span>0–0,9</span><input id="rateExpo" data-rate type="number" min="0" max="0.9" step="0.01" value="0.30" disabled></label>
+            <label>TPA <span>%</span><input id="tpaAttenuation" data-tpa type="number" min="0" max="100" step="1" value="20" disabled></label>
+            <label>TPA breakpoint <span>throttle %</span><input id="tpaBreakpoint" data-tpa type="number" min="0" max="100" step="1" value="70" disabled></label>
+          </div>
+        </article>
+        <article class="rates-card">
+          <header><div><small>NOISE CONTROL</small><h2>Gyroscope and D-term filters</h2></div>
+            <p>Lower frequencies reduce vibration reaching the controller. D-term must not exceed the gyro cutoff.</p></header>
+          <div class="rates-fields filter-fields">
+            <label>Gyro low-pass <span>Hz</span><input id="gyroLpfHz" data-filter type="number" min="50" max="250" step="5" value="100" disabled></label>
+            <label>D-term low-pass <span>Hz</span><input id="dtermLpfHz" data-filter type="number" min="20" max="200" step="5" value="60" disabled></label>
           </div>
         </article>
         <div class="actions"><button id="resetButton" class="button ghost" disabled>Restore defaults</button><div>
@@ -168,7 +176,7 @@
           <div><small>ARM / IDLE</small><h2>Motor idle speed</h2>
             <p>Minimum output maintained while the quad is armed and throttle is at zero.</p></div>
           <div class="protocol-control">
-            <input id="motorIdlePercent" type="number" min="1" max="10" step="0.1" value="3.0" disabled>
+            <input id="motorIdlePercent" type="number" min="1" max="10" step="0.1" value="5.0" disabled>
             <span>%</span>
             <button id="applyMotorIdleButton" class="button secondary protocol-action" disabled>Apply and<br>save</button>
           </div>
@@ -321,10 +329,11 @@
     </main>
   </div>
   <div id="toast" class="toast" role="status"></div>
-  <script src="quad-renderer.js"></script>
-  <script src="diagnostic-logic.js"></script>
-  <script src="attitude-logic.js"></script>
-  <script src="app.js"></script>
+  <script src="quad-renderer-logic.js?v=20260805-2"></script>
+  <script src="quad-renderer.js?v=20260805-2"></script>
+  <script src="diagnostic-logic.js?v=20260805-2"></script>
+  <script src="attitude-logic.js?v=20260805-2"></script>
+  <script src="app.js?v=20260805-2"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js"></script>
 </body>

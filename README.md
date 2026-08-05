@@ -5,8 +5,9 @@ FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
 available features and adapts the interface to the connected board.
 
 FlightCodePI exposes every configurator feature: PID settings, rates/expo,
-feedforward, TPA, alignment, motor protocol and idle, calibration, protected
-PID diagnostics, flight logs, and USB BOOTSEL mode.
+feedforward, TPA, gyroscope and D-term filters, alignment, motor protocol and
+idle, calibration, protected PID diagnostics, flight logs, and USB BOOTSEL
+mode.
 
 1. Build and flash the appropriate FlightCode or FlightCodePI firmware.
 2. Restart the flight controller normally without holding BOOT.
