@@ -60,8 +60,61 @@
   margin: 20px 0;
 }
 
+.blackbox-flights-card {
+  margin-top: 18px;
+}
+
+.blackbox-flights-card > p {
+  color: var(--muted);
+  margin: 18px 0;
+}
+
+.blackbox-flight-list {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.blackbox-flight {
+  display: grid;
+  grid-template-columns: minmax(130px,.7fr) repeat(3,minmax(95px,.55fr)) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #08151b;
+}
+
+.blackbox-flight div small,
+.blackbox-flight div span {
+  display: block;
+}
+
+.blackbox-flight div small {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  margin-bottom: 5px;
+}
+
+.blackbox-flight div span {
+  font: 12px monospace;
+}
+
+.button.danger {
+  color: var(--orange);
+  border-color: #ff8a4266;
+}
+
 @media (max-width: 850px) {
   .blackbox-stats {
     grid-template-columns: 1fr;
+  }
+  .blackbox-flight {
+    grid-template-columns: 1fr 1fr;
+  }
+  .blackbox-flight button {
+    grid-column: 1 / -1;
   }
 }

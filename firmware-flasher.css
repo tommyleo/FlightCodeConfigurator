@@ -149,19 +149,6 @@
   margin-top: 18px;
 }
 
-.firmware-safety {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 18px;
-  color: var(--orange);
-  font-weight: 700;
-}
-
-.firmware-safety input {
-  width: auto;
-}
-
 .firmware-progress {
   height: 8px;
   margin-top: 20px;

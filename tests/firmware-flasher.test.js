@@ -2,9 +2,15 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
+const source = fs.readFileSync("firmware-flasher.js", "utf8");
 const context = vm.createContext({ console });
-vm.runInContext(fs.readFileSync("firmware-flasher.js", "utf8"), context);
+vm.runInContext(source, context);
 const parse = vm.runInContext("FlightCodeIntelHex.parse", context);
+
+assert.doesNotMatch(source, /\bconfirm\s*\(/);
+assert.doesNotMatch(source, /navigator\.usb\.getDevices\(\)/);
+assert.match(source, /navigator\.usb\.requestDevice\(\{filters:\[filter\]\}\)/);
+assert.match(source, /resetAfterFlash\(\)/);
 
 function record(address, type, data) {
   const bytes = [data.length, address >> 8, address & 0xff, type, ...data];

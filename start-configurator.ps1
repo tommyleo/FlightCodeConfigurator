@@ -1,13 +1,13 @@
 $configuratorRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$localUrl = "http://localhost:8080/?build=20260805-2&session=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+$localUrl = "http://localhost:8080/?build=20260805-3&session=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
 
 function Test-ConfiguratorServer {
     try {
         $response = Invoke-WebRequest -UseBasicParsing `
-            -Uri "http://localhost:8080/quad-renderer-logic.js?v=20260805-2" `
+            -Uri "http://localhost:8080/app.js?v=20260805-3" `
             -TimeoutSec 1
         return $response.StatusCode -eq 200 -and
-            $response.Content.Contains("rotateSceneVector")
+            $response.Content.Contains("GET_BLACKBOX_CATALOG")
     } catch {
         return $false
     }

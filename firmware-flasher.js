@@ -60,8 +60,8 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
   };
   const state={image:null,file:null,fileError:"",detectedBoard:"",device:null,session:null,sessionTarget:"",busy:false};
   const ui={
-    target:$("#firmwareTarget"),file:$("#firmwareFile"),fileName:$("#firmwareFileName"),size:$("#firmwareSize"),range:$("#firmwareRange"),validation:$("#firmwareValidation"),dfuState:$("#firmwareDfuState"),enter:$("#firmwareEnterDfuButton"),connect:$("#firmwareConnectDfuButton"),flash:$("#firmwareFlashButton"),safety:$("#firmwareSafetyCheck"),progress:$("#firmwareProgress"),progressText:$("#firmwareProgressText"),log:$("#firmwareLog"),
-    modeLabel:$("#firmwareModeLabel"),warning:$("#firmwareWarning"),warningTitle:$("#firmwareWarningTitle"),warningText:$("#firmwareWarningText"),fileTypeLabel:$("#firmwareFileTypeLabel"),step1Title:$("#firmwareStep1Title"),step1Text:$("#firmwareStep1Text"),step2Title:$("#firmwareStep2Title"),step2Text:$("#firmwareStep2Text"),step3Title:$("#firmwareStep3Title"),step3Text:$("#firmwareStep3Text"),safetyText:$("#firmwareSafetyText")
+    target:$("#firmwareTarget"),file:$("#firmwareFile"),fileName:$("#firmwareFileName"),size:$("#firmwareSize"),range:$("#firmwareRange"),validation:$("#firmwareValidation"),dfuState:$("#firmwareDfuState"),enter:$("#firmwareEnterDfuButton"),connect:$("#firmwareConnectDfuButton"),flash:$("#firmwareFlashButton"),progress:$("#firmwareProgress"),progressText:$("#firmwareProgressText"),log:$("#firmwareLog"),
+    modeLabel:$("#firmwareModeLabel"),warning:$("#firmwareWarning"),warningTitle:$("#firmwareWarningTitle"),warningText:$("#firmwareWarningText"),fileTypeLabel:$("#firmwareFileTypeLabel"),step1Title:$("#firmwareStep1Title"),step1Text:$("#firmwareStep1Text"),step2Title:$("#firmwareStep2Title"),step2Text:$("#firmwareStep2Text"),step3Title:$("#firmwareStep3Title"),step3Text:$("#firmwareStep3Text")
   };
 
   const hex=value=>`0x${value.toString(16).toUpperCase().padStart(8,"0")}`;
@@ -114,7 +114,13 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
     ui.validation.textContent=validation.message;ui.validation.className=validation.ok?"firmware-validation ok":"firmware-validation";
     ui.enter.disabled=state.busy||!target||!window.flightCodeConfigurator?.canEnterDfu?.()||(connectedBoard&&connectedBoard!==ui.target.value);
     ui.connect.disabled=state.busy||!target||!("usb" in navigator);
-    ui.flash.disabled=state.busy||!validation.ok||!state.session||state.sessionTarget!==ui.target.value||!ui.safety.checked;
+    ui.flash.disabled=state.busy||!validation.ok||!state.session||state.sessionTarget!==ui.target.value;
+  }
+
+  function resetAfterFlash(){
+    state.image=null;state.file=null;state.fileError="";state.detectedBoard="";state.device=null;state.session=null;state.sessionTarget="";
+    ui.target.value="";ui.file.value="";ui.fileName.textContent="No file selected";ui.size.textContent="—";ui.range.textContent="—";ui.log.textContent="";
+    updateModeUi();badge("WAITING");progress(0,"Select a target and firmware file");updateReady();
   }
 
   async function discardSession(){
@@ -195,7 +201,6 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
     const target=selectedTarget(),board=window.flightCodeConfigurator?.board?.();
     if(!target||!window.flightCodeConfigurator?.canEnterDfu?.()||board!==ui.target.value){log("Connect the selected, disarmed flight controller first.");return}
     const mode=target.kind==="pico"?"BOOTSEL":"DFU";
-    if(!confirm(`Restart the connected flight controller in ${mode} mode?`))return;
     if(TARGETS[board])setDetectedBoard(board);
     log(`Requesting ${mode} mode. After disconnection, press ${ui.connect.textContent}.`);await window.flightCodeConfigurator.enterDfu();
   }
@@ -225,19 +230,18 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
   async function flash(){
     const validation=validateImage(),target=selectedTarget(),image=state.image;
     if(!validation.ok||!state.session||state.sessionTarget!==ui.target.value)return;
-    const operation=target.kind==="pico"?`${Math.ceil((image.end-image.start)/4096)*4} KiB of application flash will be replaced.`:`${sectorsForImage(target,image).length} application sectors will be erased.`;
-    if(!confirm(`Flash ${state.file.name} to ${target.label}?\n\n${operation} Settings and flight logs will be preserved.`))return;
-    setBusy(true);ui.safety.disabled=true;
+    setBusy(true);
     try{
       if(target.kind==="pico")await flashPico(target,image);else await flashStm32(target,image);
       progress(100,"Firmware installed successfully");badge("FLASHED","online");log("Flash completed. Reconnect the board after USB enumeration.");state.session=null;state.device=null;state.sessionTarget="";
+      await new Promise(resolve=>setTimeout(resolve,1000));resetAfterFlash();
     }catch(error){badge("FLASH FAILED","armed");progress(0,"Flash failed");log(`FLASH FAILED: ${error.message}`);await discardSession()}
-    finally{ui.safety.disabled=false;setBusy(false)}
+    finally{setBusy(false)}
   }
 
   ui.file.onchange=event=>loadFile(event.target.files?.[0]||null);
   ui.target.onchange=async()=>{if(state.session&&state.sessionTarget!==ui.target.value)await discardSession();updateModeUi();badge("WAITING");progress(0,"Select firmware and connect the bootloader");updateReady()};
-  ui.safety.onchange=updateReady;ui.enter.onclick=enterBootloader;ui.connect.onclick=connectBootloader;ui.flash.onclick=flash;
+  ui.enter.onclick=enterBootloader;ui.connect.onclick=connectBootloader;ui.flash.onclick=flash;
   window.firmwareFlasher={setDetectedBoard,updateReady};
   updateModeUi();badge("WAITING");progress(0,"Select a target and firmware file");updateReady();
 })();

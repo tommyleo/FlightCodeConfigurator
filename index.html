@@ -7,7 +7,7 @@
   <title>FlightCode Configurator</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="model.css">
-  <link rel="stylesheet" href="blackbox.css">
+  <link rel="stylesheet" href="blackbox.css?v=20260805-3">
   <link rel="stylesheet" href="firmware-flasher.css">
 </head>
 <body>
@@ -285,11 +285,18 @@
           <div class="osd-enable-row"><div><b>Enable microSD Blackbox</b><small>Records gyro, setpoints, separated P/I/D terms, motors, battery and loop timing at 200 Hz.</small></div><label class="osd-switch"><input id="blackboxEnabled" type="checkbox" disabled><span></span></label></div>
           <div class="blackbox-stats">
             <div class="blackbox-stat"><small>CARD CAPACITY</small><strong id="blackboxCapacity">—</strong><span id="blackboxCapacityDetail">microSD storage</span></div>
-            <div class="blackbox-stat"><small>DATA WRITTEN</small><strong id="blackboxWritten">—</strong><span>Current power session</span></div>
+            <div class="blackbox-stat"><small>STORED FLIGHT DATA</small><strong id="blackboxStored">—</strong><span id="blackboxWrittenDetail">0 B written this power session</span></div>
             <div id="blackboxDroppedCard" class="blackbox-stat"><small>DROPPED RECORDS</small><strong id="blackboxDropped">0</strong><span id="blackboxDroppedDetail">Logging pipeline healthy</span></div>
           </div>
           <p id="blackboxMessage">Connect a compatible flight controller to check the microSD.</p>
           <div class="osd-actions"><span id="blackboxConfigState">Waiting for board</span><button id="refreshBlackboxButton" class="button ghost" disabled>Check again</button><button id="applyBlackboxButton" class="button secondary" disabled>Apply</button><button id="saveBlackboxButton" class="button primary" disabled>Save</button></div>
+        </article>
+        <article class="card blackbox-flights-card">
+          <header><span>SAVED FLIGHTS</span><small id="blackboxFlightCount">0 FLIGHTS</small></header>
+          <p id="blackboxCatalogMessage">Connect FlightCode to list the flights stored on the microSD.</p>
+          <div id="blackboxFlightList" class="blackbox-flight-list"></div>
+          <div class="diagnostic-progress"><i id="blackboxDownloadProgress"></i></div>
+          <div class="osd-actions"><span id="blackboxDownloadState">No download in progress</span><button id="clearBlackboxButton" class="button ghost danger" disabled>Erase flight catalog</button></div>
         </article>
       </section>
       <section id="firmwareView" class="view">
@@ -319,7 +326,6 @@
             <button id="firmwareConnectDfuButton" class="button secondary" disabled>Connect bootloader</button>
             <button id="firmwareFlashButton" class="button primary" disabled>Flash firmware</button>
           </div>
-          <label class="firmware-safety"><input id="firmwareSafetyCheck" type="checkbox"><span id="firmwareSafetyText">I confirm that the selected firmware matches the physical flight controller and the LiPo is disconnected.</span></label>
           <div class="firmware-progress"><i id="firmwareProgress"></i></div>
           <p id="firmwareProgressText" class="firmware-progress-text">Select a target and firmware file</p>
           <details class="firmware-log"><summary>Flashing details</summary><pre id="firmwareLog"></pre></details>
@@ -333,7 +339,9 @@
   <script src="quad-renderer.js?v=20260805-2"></script>
   <script src="diagnostic-logic.js?v=20260805-2"></script>
   <script src="attitude-logic.js?v=20260805-2"></script>
-  <script src="app.js?v=20260805-2"></script>
+  <script src="blackbox-logic.js?v=20260805-3"></script>
+  <script src="serial-port-logic.js?v=20260809-1"></script>
+  <script src="app.js?v=20260809-1"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js"></script>
 </body>
