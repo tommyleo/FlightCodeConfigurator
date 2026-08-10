@@ -21,8 +21,51 @@ It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
 On CLRACINGF4, the Blackbox page lists microSD flights retained across power
-cycles, downloads any indexed flight as a FlightCode JSON log, and provides a
-protected catalog-clear action. FlightCodePI does not expose microSD Blackbox.
+cycles. On FLYWOOF405NANO it manages the internal 16 MiB flash and its latest
+retained flight. Both targets download indexed flights as FlightCode JSON logs
+and provide a protected catalog-clear action. FlightCodePI does not expose
+persistent Blackbox storage.
+
+## Board feature matrix
+
+The interface is capability-driven: unsupported pages and controls are hidden
+or disabled after connection.
+
+| Configurator feature | MAMBAF411 | CLRACINGF4 | FLYWOOF405NANO | FlightCodePI |
+| --- | --- | --- | --- | --- |
+| PID, rates, expo, FF, TPA | Yes | Yes | Yes | Yes |
+| Balanced/Racing/Freestyle profiles | Yes | Yes | Yes | Yes |
+| Gyro and D-term filters | Yes | Yes | Yes | Yes |
+| Board alignment and live attitude | Yes | Yes | Yes | Yes |
+| SBUS channel view and receiver setup | Yes | Yes | Yes | Firmware dependent |
+| Motor protocol, direction, idle and test | Yes | Yes | Yes | Yes |
+| Guided IMU calibration | Yes | Yes | Yes | Yes |
+| Guided PID/mixer simulation | Yes | Yes | Yes | Yes |
+| Battery voltage telemetry | Yes | Yes | Yes | Firmware dependent |
+| Analog OSD setup | Yes | Yes | No (HD digital board) | Firmware dependent |
+| RAM flight-log download | Yes | Yes | Yes | Yes |
+| Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | No |
+| Blackbox write/session diagnostics | No | Storage status | Yes | No |
+| Firmware update | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | RP2350 BOOTSEL/UF2 |
+
+The Flywoo Blackbox page exposes flash readiness, used bytes, dropped records,
+the retained-flight catalog, JSON download, erase, physical **Write test** and
+synthetic **Session test**. Failures include the operation, status register and
+flash address so storage faults can be diagnosed without flying.
+
+## Available configuration and diagnostics
+
+- Read, apply and save PID, rates/expo, progressive feedforward, TPA and filter
+  values; select Balanced, Racing or Freestyle starting profiles.
+- Configure TAER/AETR receiver order, arm channel/range, motor order,
+  direction, idle and supported ESC protocol.
+- View live attitude, gyro, receiver, motor, battery and loop telemetry.
+- Run protected motor, guided IMU and simulated PID/mixer tests while disarmed.
+- Download RAM or persistent Blackbox logs as versioned FlightCode JSON,
+  including setpoints, gyro, motors, battery, loop timing and separated
+  P/I/D/FF terms.
+- Request DFU/BOOTSEL from a connected controller or enter it manually with the
+  board BOOT button when USB reset is unavailable.
 
 ## Firmware flashing
 
