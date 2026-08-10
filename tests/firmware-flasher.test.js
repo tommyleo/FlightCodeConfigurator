@@ -11,6 +11,7 @@ assert.doesNotMatch(source, /\bconfirm\s*\(/);
 assert.doesNotMatch(source, /navigator\.usb\.getDevices\(\)/);
 assert.match(source, /navigator\.usb\.requestDevice\(\{filters:\[filter\]\}\)/);
 assert.match(source, /resetAfterFlash\(\)/);
+assert.match(source, /FLYWOOF405NANO:\{label:"Flywoo GN405 Nano V3"/);
 
 function record(address, type, data) {
   const bytes = [data.length, address >> 8, address & 0xff, type, ...data];

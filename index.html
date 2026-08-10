@@ -265,6 +265,11 @@
             <button id="downloadPidDiagnosticButton" class="button secondary" disabled>Download file</button>
           </div>
         </article>
+        <article class="diagnostic-help">
+          <h3>How the simulated test advances</h3>
+          <p>Each stage starts with a three-second preparation countdown. There is no time limit for performing the requested movement.</p>
+          <p>After the movement, keep the quad still or return the stick to center for just over one second. Only then will the next stage begin.</p>
+        </article>
         <article class="flight-log-card">
           <div>
             <small>BLACKBOX RAM</small>
@@ -279,17 +284,18 @@
         </article>
       </section>
       <section id="blackboxView" class="view">
-        <header class="heading"><div><small>STORAGE / MICROSD</small><h1>Blackbox</h1></div><b id="blackboxState" class="badge">UNAVAILABLE</b></header>
+        <header class="heading"><div><small>ONBOARD STORAGE</small><h1>Blackbox</h1></div><b id="blackboxState" class="badge">UNAVAILABLE</b></header>
         <article class="card blackbox-card">
-          <header>LONG FLIGHT LOGGING <small>CLRACINGF4</small></header>
-          <div class="osd-enable-row"><div><b>Enable microSD Blackbox</b><small>Records gyro, setpoints, separated P/I/D terms, motors, battery and loop timing at 200 Hz.</small></div><label class="osd-switch"><input id="blackboxEnabled" type="checkbox" disabled><span></span></label></div>
+          <header>LONG FLIGHT LOGGING <small>MICROSD / INTERNAL FLASH</small></header>
+          <div class="osd-enable-row"><div><b>Enable persistent Blackbox</b><small>Records gyro, setpoints, separated P/I/D/FF terms, motors, battery and loop timing at 200 Hz.</small></div><label class="osd-switch"><input id="blackboxEnabled" type="checkbox" disabled><span></span></label></div>
           <div class="blackbox-stats">
-            <div class="blackbox-stat"><small>CARD CAPACITY</small><strong id="blackboxCapacity">—</strong><span id="blackboxCapacityDetail">microSD storage</span></div>
+            <div class="blackbox-stat"><small>STORAGE CAPACITY</small><strong id="blackboxCapacity">—</strong><span id="blackboxCapacityDetail">Blackbox storage</span></div>
             <div class="blackbox-stat"><small>STORED FLIGHT DATA</small><strong id="blackboxStored">—</strong><span id="blackboxWrittenDetail">0 B written this power session</span></div>
             <div id="blackboxDroppedCard" class="blackbox-stat"><small>DROPPED RECORDS</small><strong id="blackboxDropped">0</strong><span id="blackboxDroppedDetail">Logging pipeline healthy</span></div>
           </div>
-          <p id="blackboxMessage">Connect a compatible flight controller to check the microSD.</p>
-          <div class="osd-actions"><span id="blackboxConfigState">Waiting for board</span><button id="refreshBlackboxButton" class="button ghost" disabled>Check again</button><button id="applyBlackboxButton" class="button secondary" disabled>Apply</button><button id="saveBlackboxButton" class="button primary" disabled>Save</button></div>
+          <p id="blackboxMessage">Connect a compatible flight controller to check its Blackbox storage.</p>
+          <p id="blackboxWriteTestResult" class="diagnostic-result">Write test not run.</p>
+          <div class="osd-actions"><span id="blackboxConfigState">Waiting for board</span><button id="blackboxWriteTestButton" class="button ghost" disabled>Write test</button><button id="blackboxSessionTestButton" class="button ghost" disabled>Session test</button><button id="refreshBlackboxButton" class="button ghost" disabled>Check again</button><button id="applyBlackboxButton" class="button secondary" disabled>Apply</button><button id="saveBlackboxButton" class="button primary" disabled>Save</button></div>
         </article>
         <article class="card blackbox-flights-card">
           <header><span>SAVED FLIGHTS</span><small id="blackboxFlightCount">0 FLIGHTS</small></header>
@@ -307,7 +313,7 @@
         </article>
         <article class="firmware-card">
           <div class="firmware-fields">
-            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
+            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
             <label><small id="firmwareFileTypeLabel">LOCAL FIRMWARE</small><input id="firmwareFile" type="file" accept=".hex,.uf2,text/plain,application/octet-stream"></label>
           </div>
           <div class="firmware-file-info">
@@ -341,8 +347,8 @@
   <script src="attitude-logic.js?v=20260805-2"></script>
   <script src="blackbox-logic.js?v=20260805-3"></script>
   <script src="serial-port-logic.js?v=20260809-1"></script>
-  <script src="app.js?v=20260809-1"></script>
+  <script src="app.js?v=20260810-9"></script>
   <script src="pico-flasher.js"></script>
-  <script src="firmware-flasher.js"></script>
+  <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>
 </html>

@@ -56,6 +56,7 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
   const TARGETS={
     MAMBAF411:{label:"Mamba F411",filename:"MAMBAF411",kind:"stm32",extension:".hex",firmwareEnd:0x08040000,sectors:[16,16,16,16,64,128,128,128]},
     CLRACINGF4:{label:"CLRacing F4",filename:"CLRACINGF4",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
+    FLYWOOF405NANO:{label:"Flywoo GN405 Nano V3",filename:"FLYWOOF405NANO",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     PICO2_W:{label:"Raspberry Pi Pico 2 W",filename:"FLIGHTCODEPI",kind:"pico",extension:".uf2",firmwareEnd:PICO_RESERVED_START}
   };
   const state={image:null,file:null,fileError:"",detectedBoard:"",device:null,session:null,sessionTarget:"",busy:false};

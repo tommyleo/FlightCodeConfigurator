@@ -29,7 +29,8 @@ protected catalog-clear action. FlightCodePI does not expose microSD Blackbox.
 The **Firmware** tab detects the connected board and selects its matching
 bootloader and firmware format:
 
-- MAMBAF411 and CLRACINGF4 use STM32 DFU with a FlightCode `.hex` file.
+- MAMBAF411, CLRACINGF4, and FLYWOOF405NANO use STM32 DFU with a matching
+  FlightCode `.hex` file.
 - Raspberry Pi Pico 2 W uses RP2350 Picoboot with a FlightCodePI `.uf2` file.
 
 Both paths run directly from Chrome or Edge through WebUSB:

@@ -14,7 +14,8 @@ const FlightCodeBlackboxLogic=(()=>{
       batteryVoltage:values.length>=19?values[16]/100:0,cellVoltage:values.length>=19?values[17]/100:0,
       batteryCells:values.length>=19?values[18]:0,pTerm:values.length>=28?values.slice(19,22).map(v=>v/2):[0,0,0],
       iTerm:values.length>=28?values.slice(22,25).map(v=>v/2):[0,0,0],
-      dTerm:values.length>=28?values.slice(25,28).map(v=>v/2):[0,0,0]};
+      dTerm:values.length>=28?values.slice(25,28).map(v=>v/2):[0,0,0],
+      ffTerm:values.length>=31?values.slice(28,31).map(v=>v/2):[0,0,0]};
   }
 
   return {stopReasonName,decodeRecord};

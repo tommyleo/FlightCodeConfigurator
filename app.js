@@ -26,7 +26,8 @@ const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,t
 ]};
 const stationaryDiagnostic={running:false,phase:"idle",phaseStarted:0,sawCalibration:false,samples:[],file:null,
   settleMs:8000,recordMs:15000,timeoutMs:45000};
-const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,timer:null,aborted:false,abortMessage:"",detected:false,neutralSince:0,stages:[
+const pidDiagnostic={running:false,stage:-1,stageStarted:0,readyAt:0,samples:[],file:null,timer:null,aborted:false,abortMessage:"",detected:false,neutralSince:0,
+  prepareMs:3000,neutralHoldMs:1200,stages:[
   {key:"stabile",ms:2000,text:"Keep the quad still with throttle at zero"},
   {key:"throttle50",ms:4000,text:"Raise throttle to about 50%, then return it to zero"},
   {key:"feedbackRoll",ms:4000,text:"Sticks centered: manually tilt the quad right and left"},
@@ -36,12 +37,12 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,samples:[],file:null,
   {key:"commandPitch",ms:4000,text:"Move pitch nose-down, then center the stick"},
   {key:"commandYaw",ms:4000,text:"Move yaw right, then center the stick"}
 ]};
-const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null};
+const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null,blackboxDiagnostics:null};
 const blackbox={flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false};
 const tuningProfiles={
-  balanced:{label:"BALANCED",pids:[.09,.2,.0012,.09,.2,.0012,.12,.2,0],rates:[540,540,410],expo:.35,ff:[.025,.025,.015],tpa:[0,65],filters:[100,60]},
-  racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,320],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[100,60]},
-  freestyle:{label:"FREESTYLE",pids:[.09,.22,.0014,.09,.22,.0014,.12,.22,0],rates:[650,650,500],expo:.35,ff:[.025,.025,.015],tpa:[0,65],filters:[100,60]}
+  balanced:{label:"BALANCED",pids:[.1005,.2,.0010,.1005,.2,.0008,.155,.25,0],rates:[500,500,400],expo:.35,ff:[.022,.022,.013],tpa:[20,70],filters:[90,50]},
+  racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,350],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[90,50]},
+  freestyle:{label:"FREESTYLE",pids:[.1005,.2,.0011,.1005,.2,.0009,.155,.25,0],rates:[650,650,500],expo:.40,ff:[.020,.020,.012],tpa:[20,65],filters:[90,50]}
 };
 const $=s=>document.querySelector(s);
 
@@ -137,15 +138,19 @@ function formatBytes(bytes){if(bytes<1024)return `${bytes} B`;if(bytes<1048576)r
 function formatCardCapacity(mebibytes){
   if(!mebibytes)return {main:"—",detail:"Capacity unavailable"};
   if(mebibytes>=1024)return {main:`${(mebibytes/1024).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1})} GiB`,detail:`${mebibytes.toLocaleString()} MiB detected`};
-  return {main:`${mebibytes.toLocaleString()} MiB`,detail:"microSD storage"};
+  return {main:`${mebibytes.toLocaleString()} MiB`,detail:hasCapability("BLACKBOX_FLASH")?"internal SPI flash":"microSD storage"};
 }
 function updateBlackboxControls(){
   const supported=state.connected&&hasCapability("BLACKBOX_SD"),catalogSupported=hasCapability("BLACKBOX_CATALOG"),ready=state.blackboxState==="READY"&&!blackbox.busy;
-  $("#blackboxEnabled").disabled=!supported||!ready;
+  const internalFlash=hasCapability("BLACKBOX_FLASH");
+  if(internalFlash)$("#blackboxEnabled").checked=true;
+  $("#blackboxEnabled").disabled=internalFlash||!supported||!ready;
   $("#refreshBlackboxButton").disabled=!supported;
   $("#applyBlackboxButton").disabled=!supported||!ready;
   $("#saveBlackboxButton").disabled=!supported||!ready;
   $("#clearBlackboxButton").disabled=!supported||!catalogSupported||!ready||state.armed||blackbox.downloading||blackbox.flights.length===0;
+  $("#blackboxWriteTestButton").disabled=!supported||!internalFlash||!ready||state.armed||blackbox.downloading;
+  $("#blackboxSessionTestButton").disabled=!supported||!internalFlash||!ready||state.armed||blackbox.downloading;
   document.querySelectorAll("[data-blackbox-download]").forEach(button=>button.disabled=!catalogSupported||!ready||state.armed||blackbox.downloading);
   badge($("#blackboxState"),supported?state.blackboxState:"UNAVAILABLE",ready?"online":state.blackboxState==="RECORDING"?"armed":"");
 }
@@ -162,7 +167,7 @@ function renderBlackboxFlights(){
   $("#blackboxFlightCount").textContent=`${blackbox.flights.length} ${blackbox.flights.length===1?"FLIGHT":"FLIGHTS"}`;
   $("#blackboxCatalogMessage").textContent=blackbox.flights.length
     ?"Flights remain available after power cycles and can be downloaded as FlightCode JSON logs."
-    :"No indexed Blackbox flights are stored on the microSD.";
+    :`No indexed Blackbox flights are stored on the ${hasCapability("BLACKBOX_FLASH")?"internal flash":"microSD"}.`;
   $("#blackboxFlightList").innerHTML=blackbox.flights.map(flight=>`<div class="blackbox-flight">
     <div><small>FLIGHT</small><span>#${flight.id}</span></div>
     <div><small>DURATION</small><span>${(flight.records/200).toFixed(1)} s</span></div>
@@ -190,7 +195,7 @@ function startBlackboxDownload(flightId){
 
 function finishBlackboxDownload(){
   const flight=blackbox.flight;
-  const file={format:"FlightCode-Flight-Log",version:4,source:"microSD Blackbox",flightId:flight.id,
+  const file={format:"FlightCode-Flight-Log",version:5,source:"microSD Blackbox",flightId:flight.id,
     created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:200,
     alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:$("#motorDirection").value,rates:getRates(),feedforward:getFeedforward(),
@@ -314,7 +319,7 @@ async function enterDfuMode(){
 }
 window.flightCodeConfigurator={
   board:()=>state.board,
-  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","PICO2_W"].includes(state.board),
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","PICO2_W"].includes(state.board),
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
@@ -548,27 +553,36 @@ async function startPidDiagnostic(){
     toast("Disarm the quad, stop the other tests, and confirm that the propellers are removed");return;
   }
   await send("PID_SIM_ENABLE 1");
-  pidDiagnostic.running=true;pidDiagnostic.stage=-1;pidDiagnostic.samples=[];pidDiagnostic.file=null;pidDiagnostic.aborted=false;pidDiagnostic.abortMessage="";pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;
+  pidDiagnostic.running=true;pidDiagnostic.stage=-1;pidDiagnostic.samples=[];pidDiagnostic.file=null;pidDiagnostic.aborted=false;pidDiagnostic.abortMessage="";pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.readyAt=0;
   $("#startPidDiagnosticButton").disabled=true;$("#cancelPidDiagnosticButton").disabled=false;$("#downloadPidDiagnosticButton").disabled=true;
   pidDiagnosticUi("Set throttle to zero, then enable the configured ARM switch.","Waiting for arming…","",0);
 }
 function beginPidStage(index){
-  pidDiagnostic.stage=index;pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.stageStarted=performance.now();
+  const now=performance.now();
+  pidDiagnostic.stage=index;pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.stageStarted=now;
   if(index>=pidDiagnostic.stages.length){
     pidDiagnosticUi("Center all sticks, set throttle to zero, and disable the ARM switch.","Waiting for disarm to end the simulation…","",100);
     return;
   }
   if(index>0)send("PID_SIM_RESET",false);
+  pidDiagnostic.readyAt=now+pidDiagnostic.prepareMs;
   pidDiagnosticUi(pidDiagnostic.stages[index].text,
-    `Stage ${index+1} of ${pidDiagnostic.stages.length} · waiting for movement`,"",
+    `Stage ${index+1} of ${pidDiagnostic.stages.length} · get ready (3.0 s)`,"",
     100*index/pidDiagnostic.stages.length);
 }
 function updatePidStage(gyro,channelValues){
   const now=performance.now(),key=pidDiagnostic.stages[pidDiagnostic.stage].key;
+  if(now<pidDiagnostic.readyAt){
+    const remaining=(pidDiagnostic.readyAt-now)/1000;
+    pidDiagnosticUi(pidDiagnostic.stages[pidDiagnostic.stage].text,
+      `Stage ${pidDiagnostic.stage+1} of ${pidDiagnostic.stages.length} · get ready (${remaining.toFixed(1)} s)`,"",
+      100*pidDiagnostic.stage/pidDiagnostic.stages.length);
+    return;
+  }
   if(key==="stabile"){
     if(Math.hypot(...gyro)<5){
-      if(now-pidDiagnostic.stageStarted>=2000)beginPidStage(pidDiagnostic.stage+1);
-    }else pidDiagnostic.stageStarted=now;
+      if(now-pidDiagnostic.readyAt>=2000)beginPidStage(pidDiagnostic.stage+1);
+    }else pidDiagnostic.readyAt=now;
     return;
   }
   const axis=key==="feedbackRoll"?0:key==="feedbackPitch"?1:key==="feedbackYaw"?2:-1;
@@ -587,7 +601,7 @@ function updatePidStage(gyro,channelValues){
   if(pidDiagnostic.detected){
     if(neutral){
       if(pidDiagnostic.neutralSince===0)pidDiagnostic.neutralSince=now;
-      if(now-pidDiagnostic.neutralSince>=500)beginPidStage(pidDiagnostic.stage+1);
+      if(now-pidDiagnostic.neutralSince>=pidDiagnostic.neutralHoldMs)beginPidStage(pidDiagnostic.stage+1);
     }else pidDiagnostic.neutralSince=0;
   }
 }
@@ -610,7 +624,8 @@ function recordPidDiagnostic(timestamp,signal,armed,gyro,accel,channelValues,mot
     return;
   }
   if(!armed){cancelPidDiagnostic("Quad disarmed before completion: check interrupted.");return}
-  pidDiagnostic.samples.push({stage:pidDiagnostic.stages[pidDiagnostic.stage].key,timestampUs:timestamp,gyro,accel,motors:motorValues,channels:channelValues.slice(0,6)});
+  if(performance.now()>=pidDiagnostic.readyAt)
+    pidDiagnostic.samples.push({stage:pidDiagnostic.stages[pidDiagnostic.stage].key,timestampUs:timestamp,gyro,accel,motors:motorValues,channels:channelValues.slice(0,6)});
   updatePidStage(gyro,channelValues);
 }
 function downloadPidDiagnostic(){
@@ -635,13 +650,14 @@ function startFlightLogDownload(){
 function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
-  const file={format:"FlightCode-Flight-Log",version:3,created:new Date().toISOString(),
+  const file={format:"FlightCode-Flight-Log",version:4,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",sampleRateHz:flightLog.rate,
     alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:$("#motorDirection").value,rates:getRates(),
     feedforward:getFeedforward(),
     pids:getPids(),tpa:getTpa(),stopReason:last?.stopReason||"UNKNOWN",
     receiverDiagnostics:flightLog.receiverDiagnostics,
+    blackboxDiagnostics:flightLog.blackboxDiagnostics,
     samples:flightLog.records};
   if(hasCapability("FILTERS"))file.filters=getFilters();
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
@@ -745,7 +761,15 @@ function line(value){
     $("#blackboxDroppedCard").classList.toggle("healthy",dropped===0);$("#blackboxDroppedCard").classList.toggle("warning",dropped>0);
     $("#blackboxDroppedDetail").textContent=dropped===0?"Logging pipeline healthy":"The microSD could not keep up";
     $("#blackboxConfigState").textContent=p[7]==="1"?"Saved to flash":"Unsaved changes";
-    $("#blackboxMessage").textContent=blackbox.busy?"Finalizing the flight catalog on the microSD…":state.blackboxState==="READY"?"microSD detected and ready for long flight logs.":state.blackboxState==="RECORDING"?"Recording the current flight.":state.blackboxState==="ABSENT"?"Insert a microSD and select Check again.":state.blackboxState==="ERROR"?"The microSD could not be initialized. Check its contacts, then select Check again.":"Blackbox is not supported by this board.";
+    const flashStorage=hasCapability("BLACKBOX_FLASH");
+    const errorNames=["NONE","RESET_FAILED","JEDEC_FAILED","HEADER_READ_FAILED","STATUS_TIMEOUT","ERASE_WREN_FAILED","PROGRAM_WREN_FAILED"];
+    const operationNames=["NONE","HEADER","RECORD","FINALIZE","ERASE"];
+    const errorCode=Number(p[11])||0,errorOperation=Number(p[12])||0,errorStatus=p[13]||"??",errorAddress=p[14]||"000000";
+    $("#blackboxMessage").textContent=blackbox.busy?`Preparing ${flashStorage?"the internal flash":"the microSD"}…`:state.blackboxState==="READY"?`${flashStorage?"Internal flash":"microSD"} detected and ready for long flight logs.`:state.blackboxState==="RECORDING"?"Recording the current flight.":state.blackboxState==="ABSENT"?"Insert a microSD and select Check again.":state.blackboxState==="ERROR"?`${flashStorage?"The internal flash":"The microSD"} could not be initialized.`:"Blackbox is not supported by this board.";
+    if(state.blackboxState==="ERROR"){
+      const detail=`${errorNames[errorCode]||`ERROR_${errorCode}`} · operation=${operationNames[errorOperation]||errorOperation} · status=0x${errorStatus} · address=0x${errorAddress}`;
+      $("#blackboxMessage").textContent=detail;$("#blackboxWriteTestResult").textContent=detail;$("#blackboxWriteTestResult").className="diagnostic-result warn";
+    }
     if(!hasCapability("BLACKBOX_CATALOG"))$("#blackboxCatalogMessage").textContent="Update FlightCode firmware to enable persistent flight listing and downloads.";
     updateBlackboxControls();if(blackbox.busy)setTimeout(()=>send("GET_BLACKBOX_STATUS",false),500);else if(hasCapability("BLACKBOX_CATALOG")&&(wasBusy||catalogCount!==blackbox.flights.length))requestBlackboxCatalog();return
   }
@@ -803,6 +827,32 @@ function line(value){
       frameAgeMs:Number(p[6]),validFrames:Number(p[7]),
       uartErrors:Number(p[8]),recoveries:Number(p[9])}:null;
     updateFlightLogUi();return;
+  }
+  if(p[1]==="BLACKBOX_DIAGNOSTICS"&&p.length>=16){
+    const reject=Number(p[4])||0;
+    flightLog.blackboxDiagnostics={
+      jedecId:p[2],startCalls:Number(p[3]),startRejectMask:reject,
+      startRejectReasons:[reject&1?"DISABLED":null,reject&2?"NOT_READY":null,reject&4?"ERASING":null,reject&8?"INVALID_WRITE_BANK":null,reject&16?"WRITE_BANK_IS_RETAINED":null].filter(Boolean),
+      appendCalls:Number(p[5]),stopCalls:Number(p[6]),completedRecords:Number(p[7]),
+      lastRetain:p[8]==="1",state:Number(p[9]),operation:Number(p[10]),queueCount:Number(p[11]),
+      writeBank:Number(p[12]),retainedBank:Number(p[13]),eraseActive:p[14]==="1",finalisePending:p[15]==="1"};
+    return;
+  }
+  if(p[1]==="BLACKBOX_WRITE_TEST"&&p.length>=10){
+    const ok=p[6]==="1",mismatch=Number(p[7]);
+    const result=$("#blackboxWriteTestResult");
+    const phases=`erased=${p[3]} · program=${p[4]} · read=${p[5]}`;
+    result.textContent=ok
+      ?`Write test passed at 0x${p[2]} · ${phases} · bank is being erased again`
+      :`Write test failed at 0x${p[2]} · ${phases} · byte ${mismatch}: expected 0x${p[8]}, read 0x${p[9]}`;
+    result.className=`diagnostic-result ${ok?"ok":"warn"}`;
+    toast(ok?"Internal flash write/read test passed":"Internal flash write/read test failed");
+    return;
+  }
+  if(p[1]==="BLACKBOX_SESSION_TEST"&&p[2]==="STARTED"){
+    $("#blackboxWriteTestResult").textContent="Session test started: finalizing one synthetic record…";
+    $("#blackboxWriteTestResult").className="diagnostic-result";
+    return;
   }
   if(p[1]==="FLIGHT_LOG"&&flightLog.downloading&&p.length>=19){
     const n=p.slice(3).map(Number),index=Number(p[2]);
@@ -908,6 +958,16 @@ $("#saveOsdButton").onclick=async()=>{await send(osdCommand());await send("SAVE_
 function blackboxCommand(){return `SET_BLACKBOX ${$("#blackboxEnabled").checked?1:0}`}
 $("#blackboxEnabled").onchange=()=>{state.blackboxDirty=true;$("#blackboxConfigState").textContent="Local changes"};
 $("#refreshBlackboxButton").onclick=()=>{send("GET_BLACKBOX_STATUS");requestBlackboxCatalog()};
+$("#blackboxWriteTestButton").onclick=async()=>{
+  if(state.armed||blackbox.busy)return;
+  $("#blackboxConfigState").textContent="Writing and reading the internal flash…";
+  await send("BLACKBOX_WRITE_TEST");
+};
+$("#blackboxSessionTestButton").onclick=async()=>{
+  if(state.armed||blackbox.busy)return;
+  $("#blackboxWriteTestResult").textContent="Starting a complete synthetic Blackbox session…";
+  await send("BLACKBOX_SESSION_TEST");
+};
 $("#applyBlackboxButton").onclick=async()=>{await send(blackboxCommand());state.blackboxDirty=false;$("#blackboxConfigState").textContent="Applied · not saved"};
 $("#saveBlackboxButton").onclick=async()=>{await send(blackboxCommand());await send("SAVE_SETTINGS");state.blackboxDirty=false;$("#blackboxConfigState").textContent="Saved to flash"};
 $("#clearBlackboxButton").onclick=async()=>{
@@ -921,7 +981,6 @@ buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${ge
 $("#resetAttitudeButton").onclick=resetAttitude;
 $("#calibrateGyroButton").onclick=async()=>{
   if(state.armed){toast("Disarm the quad before calibration");return}
-  if(!confirm("Place the quad still and level. Start gyroscope calibration?"))return;
   await send("CALIBRATE_GYRO");toast("Calibration in progress: do not move the quad");
 };
 $("#startImuDiagnosticButton").onclick=startImuDiagnostic;
