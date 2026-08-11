@@ -1,6 +1,6 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-let receiverConfig={order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",protocol:0,capabilities:new Set(),osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+let receiverConfig={protocol:"SBUS",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),receiverProtocols:["SBUS"],receiverProtocolsReported:false,osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -89,7 +89,7 @@ function updateModeRange(i){
   const left=(min-900)/12,width=(max-min)/12;$(`#modeRangeActive${i}`).style.cssText=`left:${left}%;width:${width}%`;$(`#modeRangeValue${i}`).textContent=`${min}–${max} µs`;
 }
 function setReceiverConfig(config,saved=false){
-  receiverConfig=config;$("#receiverChannelOrder").value=config.order;
+  receiverConfig=config;$("#receiverProtocol").value=config.protocol||"SBUS";$("#receiverChannelOrder").value=config.order;updateReceiverProtocolUi();
   config.modes.forEach((mode,i)=>{$(`#modeFunction${i}`).value=mode.fn;$(`#modeChannel${i}`).value=mode.channel;$(`#modeMin${i}`).value=mode.min;$(`#modeMax${i}`).value=mode.max;updateModeRange(i)});
   $("#receiverConfigState").textContent=saved?"Saved to flash":"Unsaved changes";updateReceiverLabels();
 }
@@ -97,10 +97,13 @@ function getReceiverConfig(){
   const modes=[0,1].map(i=>({fn:$(`#modeFunction${i}`).value,channel:Number($(`#modeChannel${i}`).value),min:Number($(`#modeMin${i}`).value),max:Number($(`#modeMax${i}`).value)}));
   if(new Set(modes.map(m=>m.fn)).size!==2)throw new Error("Select ARM and BEEP once each");
   if(modes.some(m=>m.min>=m.max))throw new Error("Each mode needs a valid minimum and maximum");
-  return {order:$("#receiverChannelOrder").value,modes};
+  return {protocol:$("#receiverProtocol").value,order:$("#receiverChannelOrder").value,modes};
 }
-function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn==="ARM"),beep=c.modes.find(m=>m.fn==="BEEP");return `SET_RECEIVER_CONFIG ${c.order} ${arm.channel} ${arm.min} ${arm.max} ${beep.channel} ${beep.min} ${beep.max}`}
+function updateReceiverProtocolUi(){const protocol=$("#receiverProtocol").value;$("#receiverInputType").textContent=`INPUT / ${protocol}`;$("#receiverDiagnosticsType").textContent=`${protocol} DIAGNOSTICS`;$("#sbusDiagnosticMessage").textContent=`Waiting for ${protocol} receiver diagnostics…`}
+function setReceiverProtocols(protocols,reported=true){state.receiverProtocols=protocols.length?protocols:["SBUS"];state.receiverProtocolsReported=reported;const select=$("#receiverProtocol"),selected=state.receiverProtocols.includes(receiverConfig.protocol)?receiverConfig.protocol:state.receiverProtocols[0];select.replaceChildren(...state.receiverProtocols.map(protocol=>new Option(protocol==="ELRS"?"ELRS (CRSF)":protocol,protocol)));select.value=selected;receiverConfig.protocol=selected;updateReceiverProtocolUi()}
+function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn==="ARM"),beep=c.modes.find(m=>m.fn==="BEEP"),protocol=state.receiverProtocolsReported?`${c.protocol} `:"";return `SET_RECEIVER_CONFIG ${protocol}${c.order} ${arm.channel} ${arm.min} ${arm.max} ${beep.channel} ${beep.min} ${beep.max}`}
 [0,1].forEach(i=>{$(`#modeMin${i}`).oninput=()=>updateModeRange(i);$(`#modeMax${i}`).oninput=()=>updateModeRange(i)});setReceiverConfig(receiverConfig);
+$("#receiverProtocol").onchange=()=>{updateReceiverProtocolUi();$("#receiverConfigState").textContent="Unsaved changes"};
 function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}View`));document.querySelectorAll(".nav").forEach(v=>v.classList.toggle("active",v.dataset.view===name))}
 document.querySelectorAll(".nav").forEach(v=>v.onclick=()=>view(v.dataset.view));
 function badge(el,text,type=""){el.textContent=text;el.className=`badge ${type}`}
@@ -116,7 +119,7 @@ function updateSbusDiagnostics(valid,age,frames,errors,recoveries,overruns,inval
   $("#sbusFrameAge").textContent=age===4294967295?"NEVER":`${age} ms`;
   $("#sbusValidFrames").textContent=frames.toLocaleString();$("#sbusUartErrors").textContent=errors.toLocaleString();
   $("#sbusRecoveries").textContent=recoveries.toLocaleString();$("#sbusOverruns").textContent=overruns.toLocaleString();$("#sbusInvalidFrames").textContent=invalid.toLocaleString();
-  $("#sbusDiagnosticMessage").textContent=!valid?"No valid SBUS signal.":issues>0?"SBUS errors detected: check signal wire, ground, connector and receiver power.":"No SBUS communication errors detected since startup.";
+  const protocol=receiverConfig.protocol||"SBUS";$("#sbusDiagnosticMessage").textContent=!valid?`No valid ${protocol} signal.`:issues>0?`${protocol} errors detected: check signal wire, ground, connector and receiver power.`:`No ${protocol} communication errors detected since startup.`;
 }
 function saveState(text,type=""){const el=$("#saveState");el.textContent=text;el.className=`save-state ${type}`}
 function hasCapability(name){return state.capabilities.has(name)}
@@ -262,6 +265,7 @@ function applyCapabilities(){
   [buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(element=>element.disabled=!state.connected||!hasCapability("PIDS"));
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
   updateDfuButton();
+  if(!state.connected){state.imuName="";$("#diagnosticImuName").textContent="IMU —"}
 }
 function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;window.firmwareFlasher?.updateReady?.()}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
@@ -799,7 +803,7 @@ function line(value){
   }
   if(p[1]==="HELLO"){
     if(!["FlightCode","FlightCodePI"].includes(p[2])){toast(`Unrecognized device: ${p[2]||"unknown"}`);return}
-    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();updateConnectionText();
+    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();setReceiverProtocols(["SBUS"],false);updateConnectionText();
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
     if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
     updateMotorProtocolOptions();applyCapabilities();window.firmwareFlasher?.setDetectedBoard?.(state.board);
@@ -814,8 +818,10 @@ function line(value){
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);if(hasCapability("BLACKBOX_CATALOG"))requestBlackboxCatalog()
     return;
   }
+  if(p[1]==="RECEIVER_PROTOCOLS"){setReceiverProtocols(p.slice(2),true);return}
   if(p[1]==="IMU"){
     const available=p.at(-1)==="1",name=p.slice(2,-1).join(" ");
+    state.imuName=name;$("#diagnosticImuName").textContent=name||"IMU —";
     $("#deviceName").textContent=`FlightCode · ${state.board} · ${name}`;
     if(!available)toast(`IMU not detected: ${name}`);
     return;
@@ -869,7 +875,8 @@ function line(value){
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
   if(p[1]==="FILTERS"&&p.length>=5){setFilters(p.slice(2,4));saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
-  if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
+  if(p[1]==="RECEIVER_CONFIG"&&p.length>=11){setReceiverConfig({protocol:p[2],order:p[3],modes:[{fn:"ARM",channel:Number(p[4]),min:Number(p[5]),max:Number(p[6])},{fn:"BEEP",channel:Number(p[7]),min:Number(p[8]),max:Number(p[9])}]},p[10]==="1");return}
+  if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({protocol:"SBUS",order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
   if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="MOTOR_PROTOCOL"){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));

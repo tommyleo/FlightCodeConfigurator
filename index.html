@@ -75,14 +75,15 @@
         </div>
       </section>
       <section id="receiverView" class="view">
-        <header class="heading"><div><small>INPUT / SBUS</small><h1>Receiver channels</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
+        <header class="heading"><div><small id="receiverInputType">INPUT / SBUS</small><h1>Receiver channels</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
         <article class="receiver-config">
+          <div id="receiverProtocolRow" class="receiver-order"><label for="receiverProtocol"><small>RECEIVER TYPE</small>Serial protocol</label><select id="receiverProtocol" data-receiver-config disabled><option value="SBUS">SBUS</option></select></div>
           <div class="receiver-order"><label for="receiverChannelOrder"><small>CHANNEL MAP</small>First four channels</label><select id="receiverChannelOrder" data-receiver-config disabled><option>TAER1234</option><option>AETR1234</option></select></div>
           <div id="receiverModes" class="receiver-modes"></div>
           <div class="receiver-actions"><span id="receiverConfigState">Waiting for board settings</span><button id="applyReceiverConfigButton" class="button secondary" disabled>Apply</button><button id="saveReceiverConfigButton" class="button primary" disabled>Save</button></div>
         </article>
         <article id="sbusDiagnostics" class="sbus-diagnostics waiting">
-          <div class="sbus-diagnostic-heading"><div><small>SBUS DIAGNOSTICS</small><h2>Signal quality</h2></div><b id="sbusHealth">WAITING</b></div>
+          <div class="sbus-diagnostic-heading"><div><small id="receiverDiagnosticsType">SBUS DIAGNOSTICS</small><h2>Signal quality</h2></div><b id="sbusHealth">WAITING</b></div>
           <div class="sbus-diagnostic-grid">
             <div><small>FRAME AGE</small><strong id="sbusFrameAge">—</strong></div>
             <div><small>VALID FRAMES</small><strong id="sbusValidFrames">0</strong></div>
@@ -215,7 +216,7 @@
         </article>
       </section>
       <section id="diagnosticView" class="view">
-        <header class="heading"><div><small>SENSORS / BENCH ANALYSIS</small><h1>IMU diagnostics</h1></div><b class="badge">NO PROPELLERS</b></header>
+        <header class="heading"><div><small>SENSORS / BENCH ANALYSIS</small><div class="heading-title"><h1>IMU diagnostics</h1><b id="diagnosticImuName" class="imu-name">IMU —</b></div></div><b class="badge">NO PROPELLERS</b></header>
         <article class="imu-diagnostic">
           <div>
             <small>GUIDED PROCEDURE</small>
