@@ -48,6 +48,7 @@
           </div>
           <div class="telemetry">
             <article class="card loop"><header>CONTROL LOOP <small>LIVE</small></header><strong id="loopFrequency">—</strong><span>Hz</span><p>Maximum period: <b id="loopMaxPeriod">—</b> µs</p></article>
+            <article class="card"><header>MAIN LOOP <small>REBOOT REQUIRED</small></header><label for="mainLoopHz">Control and gyro scheduler</label><select id="mainLoopHz" disabled><option value="8000">8 kHz</option><option value="16000" selected>16 kHz</option><option value="32000">32 kHz</option></select><button id="applyMainLoopButton" class="button secondary" disabled>Save and apply on reboot</button><p id="mainLoopState">Waiting for board settings</p></article>
             <article class="card"><header>GYROSCOPE <small>°/s</small></header><div class="triple">
               <div><small>ROLL</small><b id="gyroRoll">0.0</b></div><div><small>PITCH</small><b id="gyroPitch">0.0</b><small id="gyroPitchRaw">RAW: —</small></div><div><small>YAW</small><b id="gyroYaw">0.0</b></div>
             </div></article>
@@ -147,8 +148,8 @@
           <div class="protocol-control">
             <select id="motorProtocol" disabled>
               <option value="DSHOT300">DSHOT300</option>
-              <option value="MULTISHOT">MultiShot · 5–25 µs</option>
-              <option value="ONESHOT125">OneShot125 · 125–250 µs</option>
+              <option value="DSHOT600">DSHOT600</option>
+              <option value="DSHOT1200">DSHOT1200</option>
             </select>
             <button id="applyProtocolButton" class="button secondary protocol-action" disabled>Apply<br>protocol</button>
           </div>

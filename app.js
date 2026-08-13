@@ -74,6 +74,7 @@ for(let i=0;i<4;i++){
 }
 const buttons={connect:$("#connectButton"),read:$("#readButton"),apply:$("#applyButton"),save:$("#saveButton"),reset:$("#resetButton")};
 buttons.applyProtocol=$("#applyProtocolButton");
+buttons.applyMainLoop=$("#applyMainLoopButton");
 buttons.applyAlignment=$("#applyAlignmentButton");buttons.saveAlignment=$("#saveAlignmentButton");
 buttons.applyMotorDirection=$("#applyMotorDirectionButton");
 buttons.applyMotorIdle=$("#applyMotorIdleButton");
@@ -216,8 +217,8 @@ function selectOsdPosition(position){
 }
 function updateMotorProtocolOptions(){
   const values=state.board==="PICO2_W"
-    ?[["DSHOT150","DSHOT150"],["DSHOT300","DSHOT300"],["DSHOT600","DSHOT600"]]
-    :[["DSHOT300","DSHOT300"],["MULTISHOT","MultiShot · 5–25 µs"],["ONESHOT125","OneShot125 · 125–250 µs"]];
+    ?[["DSHOT300","DSHOT300"],["DSHOT600","DSHOT600"],["DSHOT1200","DSHOT1200"]]
+    :[["DSHOT300","DSHOT300"],["DSHOT600","DSHOT600"],["DSHOT1200","DSHOT1200"]];
   const selected=$("#motorProtocol").value;
   $("#motorProtocol").innerHTML=values.map(([value,label])=>`<option value="${value}">${label}</option>`).join("");
   if(values.some(([value])=>value===selected))$("#motorProtocol").value=selected;
@@ -247,6 +248,7 @@ function applyCapabilities(){
   setCapabilityControls("[data-filter]","FILTERS");
   setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
+  setCapabilityControls("#mainLoopHz,#applyMainLoopButton","MAIN_LOOP");
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
   setCapabilityControls("[data-receiver-config],#applyReceiverConfigButton,#saveReceiverConfigButton","RECEIVER_CONFIG");
@@ -293,6 +295,7 @@ function connected(value){
   document.querySelectorAll("[data-tuning-profile]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-alignment]").forEach(i=>i.disabled=!value);buttons.applyAlignment.disabled=!value;buttons.saveAlignment.disabled=!value;
   $("#motorProtocol").disabled=!value;buttons.applyProtocol.disabled=!value;
+  $("#mainLoopHz").disabled=!value;buttons.applyMainLoop.disabled=!value;
   $("#motorDirection").disabled=!value;buttons.applyMotorDirection.disabled=!value;
   $("#motorIdlePercent").disabled=!value;buttons.applyMotorIdle.disabled=!value;
   $("#motorSafetyCheck").disabled=!value;
@@ -814,6 +817,7 @@ function line(value){
   }
   if(p[1]==="CAPABILITIES"){
     state.capabilities=new Set(p.slice(2));updateMotorProtocolOptions();applyCapabilities();
+    if(hasCapability("MAIN_LOOP"))send("GET_MAIN_LOOP",false);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);if(hasCapability("BLACKBOX_CATALOG"))requestBlackboxCatalog()
     return;
@@ -882,6 +886,10 @@ function line(value){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
     $("#motorProtocol").value=p[2];return;
   }
+  if(p[1]==="MAIN_LOOP"){
+    const hz=Number(p[2]);if([8000,16000,32000].includes(hz))$("#mainLoopHz").value=String(hz);
+    $("#mainLoopState").textContent=p[3]==="1"?"Saved · active after reboot":"Unsaved · save and reboot";return;
+  }
   if(p[1]==="MOTOR_DIRECTION"){if(["NORMAL","REVERSED"].includes(p[2])){$("#motorDirection").value=p[2];updateMotorDirectionDiagram()}return}
   if(p[1]==="MOTOR_IDLE"){const value=Number(p[2]);if(Number.isFinite(value))$("#motorIdlePercent").value=value.toFixed(1);return}
   if(p[1]==="OK"){
@@ -949,6 +957,7 @@ buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PID
 buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
+buttons.applyMainLoop.onclick=async()=>{await send(`SET_MAIN_LOOP ${$("#mainLoopHz").value}`);await send("SAVE_SETTINGS");$("#mainLoopState").textContent="Saved · reboot the flight controller";toast("Main loop saved; reboot required")};
 buttons.applyMotorDirection.onclick=async()=>{await send(`SET_MOTOR_DIRECTION ${$("#motorDirection").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorIdle.onclick=async()=>{
   const value=Number($("#motorIdlePercent").value);
