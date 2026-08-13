@@ -65,9 +65,6 @@ for(let i=0;i<2;i++){
 }
 const motorPositions=["REAR RIGHT","FRONT RIGHT","REAR LEFT","FRONT LEFT"];
 for(let i=0;i<4;i++){
-  const row=document.createElement("div");row.className="motor-row";
-  row.innerHTML=`<span title="${motorPositions[i]}">M${i+1}</span><div class="meter"><i id="motorFill${i}"></i></div><output id="motorValue${i}">0.0</output>`;
-  $("#motorOutputs").append(row);
   const test=document.createElement("div");test.className="motor-test-card";
   test.innerHTML=`<div><strong>M${i+1}</strong><small>${motorPositions[i]}</small></div><input id="motorTestSlider${i}" class="vertical-motor" type="range" min="0" max="100" step="1" value="0" disabled><output id="motorTestValue${i}">0%</output>`;
   $("#motorTestGrid").append(test);
@@ -75,6 +72,7 @@ for(let i=0;i<4;i++){
 const buttons={connect:$("#connectButton"),read:$("#readButton"),apply:$("#applyButton"),save:$("#saveButton"),reset:$("#resetButton")};
 buttons.applyProtocol=$("#applyProtocolButton");
 buttons.applyMainLoop=$("#applyMainLoopButton");
+buttons.reboot=$("#rebootButton");
 buttons.applyAlignment=$("#applyAlignmentButton");buttons.saveAlignment=$("#saveAlignmentButton");
 buttons.applyMotorDirection=$("#applyMotorDirectionButton");
 buttons.applyMotorIdle=$("#applyMotorIdleButton");
@@ -249,6 +247,7 @@ function applyCapabilities(){
   setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
   setCapabilityControls("#mainLoopHz,#applyMainLoopButton","MAIN_LOOP");
+  setCapabilityControls("#rebootButton","REBOOT");
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
   setCapabilityControls("[data-receiver-config],#applyReceiverConfigButton,#saveReceiverConfigButton","RECEIVER_CONFIG");
@@ -267,9 +266,11 @@ function applyCapabilities(){
   [buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(element=>element.disabled=!state.connected||!hasCapability("PIDS"));
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
   updateDfuButton();
+  updateRebootButton();
   if(!state.connected){state.imuName="";$("#diagnosticImuName").textContent="IMU —"}
 }
 function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;window.firmwareFlasher?.updateReady?.()}
+function updateRebootButton(){buttons.reboot.disabled=!state.connected||!hasCapability("REBOOT")||state.armed||state.motorTest}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
 function updateConnectionText(){
   $("#connectionText").textContent=!state.connected?"Board not connected":
@@ -296,6 +297,7 @@ function connected(value){
   document.querySelectorAll("[data-alignment]").forEach(i=>i.disabled=!value);buttons.applyAlignment.disabled=!value;buttons.saveAlignment.disabled=!value;
   $("#motorProtocol").disabled=!value;buttons.applyProtocol.disabled=!value;
   $("#mainLoopHz").disabled=!value;buttons.applyMainLoop.disabled=!value;
+  buttons.reboot.disabled=!value;
   $("#motorDirection").disabled=!value;buttons.applyMotorDirection.disabled=!value;
   $("#motorIdlePercent").disabled=!value;buttons.applyMotorIdle.disabled=!value;
   $("#motorSafetyCheck").disabled=!value;
@@ -352,8 +354,7 @@ function attitude(timestamp,gyro,accel){
 }
 let pendingChannelValues=null,channelFramePending=false;
 function channels(values){pendingChannelValues=values;if(channelFramePending)return;channelFramePending=true;requestAnimationFrame(()=>{channelFramePending=false;pendingChannelValues.forEach((value,i)=>{const pct=Math.max(0,Math.min(100,(value-900)/12)),mode=receiverConfig.modes.find(m=>m.channel===i+1),active=mode&&value>=mode.min&&value<=mode.max;$(`#channelFill${i}`).style.width=`${pct}%`;$(`#channelFill${i}`).style.background=active?"var(--green)":"var(--cyan)";$(`#channelValue${i}`).textContent=`${Math.round(value)} µs`});receiverConfig.modes.forEach((mode,i)=>{const value=pendingChannelValues[mode.channel-1],active=Number.isFinite(value)&&value>=mode.min&&value<=mode.max,row=$(`#modeFunction${i}`).closest(".receiver-mode");row.classList.toggle("active",active);$(`#modeLiveStatus${i}`).textContent=active?"ACTIVE":"INACTIVE";$(`#modeLiveValue${i}`).textContent=Number.isFinite(value)?`${Math.round(value)} µs live`:"—"})})}
-let pendingMotorValues=null,motorFramePending=false;
-function motors(values){pendingMotorValues=values;if(motorFramePending)return;motorFramePending=true;requestAnimationFrame(()=>{motorFramePending=false;pendingMotorValues.forEach((value,i)=>{$(`#motorFill${i}`).style.width=`${Math.max(0,Math.min(100,value))}%`;$(`#motorValue${i}`).textContent=value.toFixed(1)})})}
+function motors(values){void values}
 function diagnosticUi(instruction,result,type="",progress=0){
   $("#imuDiagnosticInstruction").textContent=instruction;
   const out=$("#imuDiagnosticResult");out.textContent=result;out.className=`diagnostic-result ${type}`;
@@ -678,7 +679,7 @@ function telemetry(parts){
   const wasArmed=state.armed,wasCalibrated=state.calibrated,wasSignal=state.signal,firstTelemetry=!state.telemetrySeen;
   if(firstTelemetry)resetAttitude();
   state.armed=armed;state.signal=signal;state.telemetrySeen=true;
-  if(firstTelemetry||wasArmed!==armed)updateDfuButton();
+  if(firstTelemetry||wasArmed!==armed){updateDfuButton();updateRebootButton()}
   if(wasArmed&&!armed)setTimeout(()=>{send("GET_FLIGHT_LOG_INFO",false);if(hasCapability("BLACKBOX_SD")){send("GET_BLACKBOX_STATUS",false);requestBlackboxCatalog()}},250);
   if(!firstTelemetry&&calibrated&&!wasCalibrated)toast("Gyroscope calibration completed");
   state.calibrated=calibrated;
@@ -887,7 +888,7 @@ function line(value){
     $("#motorProtocol").value=p[2];return;
   }
   if(p[1]==="MAIN_LOOP"){
-    const hz=Number(p[2]);if([8000,16000,32000].includes(hz))$("#mainLoopHz").value=String(hz);
+    const hz=Number(p[2]);if([8000,16000].includes(hz))$("#mainLoopHz").value=String(hz);
     $("#mainLoopState").textContent=p[3]==="1"?"Saved · active after reboot":"Unsaved · save and reboot";return;
   }
   if(p[1]==="MOTOR_DIRECTION"){if(["NORMAL","REVERSED"].includes(p[2])){$("#motorDirection").value=p[2];updateMotorDirectionDiagram()}return}
@@ -958,6 +959,7 @@ buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMainLoop.onclick=async()=>{await send(`SET_MAIN_LOOP ${$("#mainLoopHz").value}`);await send("SAVE_SETTINGS");$("#mainLoopState").textContent="Saved · reboot the flight controller";toast("Main loop saved; reboot required")};
+buttons.reboot.onclick=async()=>{if(buttons.reboot.disabled)return;buttons.reboot.disabled=true;await send("REBOOT");toast("Rebooting flight controller…")};
 buttons.applyMotorDirection.onclick=async()=>{await send(`SET_MOTOR_DIRECTION ${$("#motorDirection").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorIdle.onclick=async()=>{
   const value=Number($("#motorIdlePercent").value);
