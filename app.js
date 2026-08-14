@@ -49,7 +49,7 @@ const $=s=>document.querySelector(s);
 axes.forEach(([key,label],axis)=>{
   const card=document.createElement("article");card.className="axis-card";
   card.innerHTML=`<header><b>${label}</b><small>ASSE 0${axis+1}</small></header><div class="axis-fields">${
-    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="1000" step="0.00001" value="0.00000" disabled></div>`).join("")
+    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="1000" step="0.0001" value="0.0000" disabled></div>`).join("")
   }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1" step="0.001" value="0.000" disabled></div></div>`;
   $("#pidGrid").append(card);
 });
@@ -699,7 +699,7 @@ function telemetry(parts){
   if(firstTelemetry||wasSignal!==signal)badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
   if(firstTelemetry||wasArmed!==armed||wasCalibrated!==calibrated)badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRATING",armed?"armed":calibrated?"online":"");
 }
-function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>$(`#${key}${term}`).value=Number(values[i++]).toFixed(5)))}
+function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>$(`#${key}${term}`).value=Number(values[i++]).toFixed(4)))}
 function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value);if(!Number.isFinite(value)||value<0||value>1000)throw new Error(`Invalid ${label} ${term} value`);return value}))}
 function setRates(values){["rollRate","pitchRate","yawRate"].forEach((id,i)=>$(`#${id}`).value=Number(values[i]).toFixed(0));$("#rateExpo").value=Number(values[3]).toFixed(2)}
 function getRates(){
