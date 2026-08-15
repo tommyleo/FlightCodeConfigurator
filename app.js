@@ -37,7 +37,7 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,readyAt:0,samples:[],
   {key:"commandPitch",ms:4000,text:"Move pitch nose-down, then center the stick"},
   {key:"commandYaw",ms:4000,text:"Move yaw right, then center the stick"}
 ]};
-const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null,blackboxDiagnostics:null};
+const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null,blackboxDiagnostics:null,metadata:null,metadataParts:{}};
 const blackbox={flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false};
 const tuningProfiles={
   balanced:{label:"BALANCED",pids:[.1005,.2,.0010,.1005,.2,.0008,.155,.25,0],rates:[500,500,400],expo:.35,ff:[.022,.022,.013],tpa:[20,70],filters:[90,50]},
@@ -190,19 +190,23 @@ function startBlackboxDownload(flightId){
   const flight=blackbox.flights.find(item=>item.id===flightId);
   if(!flight||blackbox.downloading||state.armed)return;
   Object.assign(blackbox,{downloading:true,flight,records:[]});
+  flight.metadata=null;flight.metadataParts={};
   $("#blackboxDownloadProgress").style.width="0%";
   $("#blackboxDownloadState").textContent=`Downloading flight #${flight.id}…`;
-  updateBlackboxControls();send(`GET_BLACKBOX_CHUNK ${flight.id} 0 4`,false);
+  updateBlackboxControls();send(`GET_BLACKBOX_METADATA ${flight.id}`,false);
 }
 
 function finishBlackboxDownload(){
   const flight=blackbox.flight;
-  const file={format:"FlightCode-Flight-Log",version:5,source:"microSD Blackbox",flightId:flight.id,
-    created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:200,
-    alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
-    motorDirection:$("#motorDirection").value,rates:getRates(),feedforward:getFeedforward(),
-    pids:getPids(),tpa:getTpa(),stopReason:stopReasonName(flight.stopFlag),samples:blackbox.records};
-  if(hasCapability("FILTERS"))file.filters=getFilters();
+  const metadata=flight.metadata;
+  const file={format:"FlightCode-Flight-Log",version:6,source:"persistent Blackbox",flightId:flight.id,
+    created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||200,
+    alignment:metadata?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
+    motorDirection:metadata?.motorDirection||$("#motorDirection").value,
+    rates:metadata?.rates||getRates(),feedforward:metadata?.feedforward||getFeedforward(),
+    pids:metadata?.pids||getPids(),tpa:metadata?.tpa||getTpa(),
+    filters:metadata?.filters||(hasCapability("FILTERS")?getFilters():undefined),
+    flightConfiguration:metadata||null,stopReason:stopReasonName(flight.stopFlag),samples:blackbox.records};
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`FlightCode-BLACKBOX-${flight.id}-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -650,24 +654,26 @@ function updateFlightLogUi(){
 }
 function startFlightLogDownload(){
   if(!state.connected||flightLog.recording||!flightLog.count)return;
-  flightLog.downloading=true;flightLog.records=[];$("#downloadFlightLogButton").disabled=true;
+  flightLog.downloading=true;flightLog.records=[];flightLog.metadata=null;flightLog.metadataParts={};$("#downloadFlightLogButton").disabled=true;
   $("#flightLogStatus").textContent="Downloading flight log…";
   $("#flightLogProgress").style.width="0%";
-  send("GET_FLIGHT_LOG_CHUNK 0 8",false);
+  send("GET_FLIGHT_LOG_METADATA",false);
 }
 function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
-  const file={format:"FlightCode-Flight-Log",version:4,created:new Date().toISOString(),
-    board:state.board||"UNKNOWN",sampleRateHz:flightLog.rate,
-    alignment:["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
-    motorDirection:$("#motorDirection").value,rates:getRates(),
-    feedforward:getFeedforward(),
-    pids:getPids(),tpa:getTpa(),stopReason:last?.stopReason||"UNKNOWN",
+  const m=flightLog.metadata;
+  const file={format:"FlightCode-Flight-Log",version:6,created:new Date().toISOString(),
+    board:state.board||"UNKNOWN",sampleRateHz:m?.logRateHz||flightLog.rate,
+    alignment:m?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
+    motorDirection:m?.motorDirection||$("#motorDirection").value,rates:m?.rates||getRates(),
+    feedforward:m?.feedforward||getFeedforward(),
+    pids:m?.pids||getPids(),tpa:m?.tpa||getTpa(),stopReason:last?.stopReason||"UNKNOWN",
+    flightConfiguration:m,
     receiverDiagnostics:flightLog.receiverDiagnostics,
     blackboxDiagnostics:flightLog.blackboxDiagnostics,
     samples:flightLog.records};
-  if(hasCapability("FILTERS"))file.filters=getFilters();
+  if(m?.filters)file.filters=m.filters;else if(hasCapability("FILTERS"))file.filters=getFilters();
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`FlightCode-FLIGHT-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -794,6 +800,23 @@ function line(value){
     const flightId=Number(p[2]),index=Number(p[3]),values=p.slice(4).map(Number);
     if(blackbox.flight?.id===flightId)blackbox.records.push(decodeLogRecord(values,index));return
   }
+  if(p[1]==="BLACKBOX_METADATA_CORE"&&blackbox.downloading){
+    const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
+    f.metadataParts.core={version:Number(p[3]),mainLoopHz:Number(p[4]),gyroRateHz:Number(p[5]),logRateHz:Number(p[6]),motorProtocol:Number(p[7]),motorDirection:Number(p[8])?"REVERSED":"NORMAL",receiverProtocol:Number(p[9]),batteryCells:Number(p[10]),initialBatteryVoltage:Number(p[11])};return
+  }
+  if(p[1]==="BLACKBOX_METADATA_PIDS"&&blackbox.downloading){
+    const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;f.metadataParts.pids=p.slice(3).map(Number);return
+  }
+  if(p[1]==="BLACKBOX_METADATA_TUNING"&&blackbox.downloading){
+    const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;f.metadataParts.tuning=p.slice(3).map(Number);return
+  }
+  if(p[1]==="BLACKBOX_METADATA_END"&&blackbox.downloading){
+    const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
+    const c=f.metadataParts.core,t=f.metadataParts.tuning,ps=f.metadataParts.pids;
+    if(c&&t&&ps)f.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10]},alignment:t.slice(11,14),motorIdlePercent:t[14]};
+    send(`GET_BLACKBOX_CHUNK ${f.id} 0 4`,false);return
+  }
+  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){send(`GET_BLACKBOX_CHUNK ${blackbox.flight.id} 0 4`,false);return}
   if(p[1]==="BLACKBOX_CHUNK_END"&&blackbox.downloading){
     const flightId=Number(p[2]),next=Number(p[3]),total=blackbox.flight.records;
     if(blackbox.flight.id!==flightId)return;
@@ -839,6 +862,17 @@ function line(value){
       uartErrors:Number(p[8]),recoveries:Number(p[9])}:null;
     updateFlightLogUi();return;
   }
+  if(p[1]==="FLIGHT_LOG_METADATA_CORE"&&flightLog.downloading){
+    flightLog.metadataParts.core={version:Number(p[2]),mainLoopHz:Number(p[3]),gyroRateHz:Number(p[4]),logRateHz:Number(p[5]),motorProtocol:Number(p[6]),motorDirection:Number(p[7])?"REVERSED":"NORMAL",receiverProtocol:Number(p[8]),batteryCells:Number(p[9]),initialBatteryVoltage:Number(p[10])};return
+  }
+  if(p[1]==="FLIGHT_LOG_METADATA_PIDS"&&flightLog.downloading){flightLog.metadataParts.pids=p.slice(2).map(Number);return}
+  if(p[1]==="FLIGHT_LOG_METADATA_TUNING"&&flightLog.downloading){flightLog.metadataParts.tuning=p.slice(2).map(Number);return}
+  if(p[1]==="FLIGHT_LOG_METADATA_END"&&flightLog.downloading){
+    const c=flightLog.metadataParts.core,t=flightLog.metadataParts.tuning,ps=flightLog.metadataParts.pids;
+    if(c&&t&&ps)flightLog.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10]},alignment:t.slice(11,14),motorIdlePercent:t[14]};
+    send("GET_FLIGHT_LOG_CHUNK 0 8",false);return
+  }
+  if(p[1]==="FLIGHT_LOG_METADATA_UNAVAILABLE"&&flightLog.downloading){send("GET_FLIGHT_LOG_CHUNK 0 8",false);return}
   if(p[1]==="BLACKBOX_DIAGNOSTICS"&&p.length>=16){
     const reject=Number(p[4])||0;
     flightLog.blackboxDiagnostics={
