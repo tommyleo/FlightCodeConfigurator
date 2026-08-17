@@ -1,6 +1,6 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
 let receiverConfig={protocol:"SBUS",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),receiverProtocols:["SBUS"],receiverProtocolsReported:false,osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),receiverProtocols:["SBUS"],receiverProtocolsReported:false,osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -829,6 +829,7 @@ function line(value){
     $("#receiverState").title=`Frame age: ${age===4294967295?"never":`${age} ms`} · Valid: ${frames} · UART errors: ${errors} · Recoveries: ${recoveries} · Overruns: ${overruns} · Invalid: ${invalid}`;return
   }
   if(p[1]==="HELLO"){
+    clearInterval(state.helloTimer);state.helloTimer=null;
     if(!["FlightCode","FlightCodePI"].includes(p[2])){toast(`Unrecognized device: ${p[2]||"unknown"}`);return}
     state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();setReceiverProtocols(["SBUS"],false);updateConnectionText();
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
@@ -951,9 +952,27 @@ async function readLoop(){
   catch(error){if(state.connected&&!state.closing){log(`Connection ended: ${error.message}`,"SYS");await disconnect()}}
 }
 async function openSerialPort(port){
-  state.port=port;await port.open({baudRate:115200});state.writer=port.writable.getWriter();resetAttitude();connected(true);state.task=readLoop();state.heartbeat=setInterval(()=>send("PING",false),1000);await send("HELLO");
+  state.port=port;await port.open({baudRate:115200,bufferSize:256});state.writer=port.writable.getWriter();resetAttitude();connected(true);state.task=readLoop();
+  await new Promise(resolve=>setTimeout(resolve,120));
+  await send("HELLO");
+  state.helloTimer=setInterval(()=>{if(state.connected&&!state.board)send("HELLO",false).catch(error=>log(`Handshake write failed: ${error.message}`,"SYS"));else{clearInterval(state.helloTimer);state.helloTimer=null}},500);
+  state.heartbeat=setInterval(()=>send("PING",false),1000);
+}
+async function connectWebUsb(){
+  if(!("usb"in navigator)||typeof FlightCodeWebUsbSerial==="undefined")throw new Error("WebUSB is not available");
+  const authorized=await FlightCodeWebUsbSerial.authorizedPorts();
+  for(const port of authorized){
+    try{await openSerialPort(port);return}catch{await disconnect()}
+  }
+  await openSerialPort(await FlightCodeWebUsbSerial.requestPort());
 }
 async function connect(){
+  const android=typeof FlightCodeWebUsbSerial!=="undefined"&&FlightCodeWebUsbSerial.isAndroid();
+  if(android){
+    try{await connectWebUsb()}
+    catch(error){if(state.port)await disconnect();toast(error.name==="NotFoundError"?"Connection cancelled":error.message)}
+    return;
+  }
   if(!("serial"in navigator)){toast("Use Chrome or Edge: Web Serial is not available");return}
   try{
     let preferred=[];
@@ -972,7 +991,7 @@ async function settleWithin(promise,timeoutMs){
 async function disconnect(){
   if(state.closing)return;state.closing=true;
   const port=state.port,reader=state.reader,writer=state.writer,task=state.task,motorTestActive=state.motorTest;
-  clearInterval(state.heartbeat);clearInterval(state.motorHeartbeat);
+  clearInterval(state.heartbeat);clearInterval(state.helloTimer);clearInterval(state.motorHeartbeat);
   state.connected=false;connected(false);buttons.connect.disabled=true;buttons.connect.textContent="Disconnecting...";
   try{
     if(writer&&motorTestActive)await settleWithin(send("MOTOR_TEST_ENABLE 0",false),250);
@@ -984,7 +1003,7 @@ async function disconnect(){
     if(port)await settleWithin(port.close(),700);
   }
   catch(error){log(`Port closing error: ${error.message}`,"SYS")}
-  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
+  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
 buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
@@ -1058,6 +1077,7 @@ document.querySelectorAll("[data-feedforward]").forEach(input=>input.oninput=()=
 document.querySelectorAll("[data-filter]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 document.querySelectorAll("[data-alignment]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 navigator.serial?.addEventListener("disconnect",()=>disconnect());connected(false);
+navigator.usb?.addEventListener("disconnect",event=>{if(state.port?.device===event.device)disconnect()});
 
 function motorTestValues(){return [0,1,2,3].map(i=>Number($(`#motorTestSlider${i}`).value))}
 async function sendMotorTest(){if(state.motorTest)await send(`MOTOR_TEST ${motorTestValues().join(" ")}`,false)}

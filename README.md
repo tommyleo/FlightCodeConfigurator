@@ -16,6 +16,19 @@ mode.
    an authorized FlightCode device, otherwise an authorized Raspberry Pi; when
    neither is available it displays the normal serial-port selector.
 
+## IIS deployment
+
+The configurator is a static website. Publish the contents of `dist` as the IIS
+site root and configure a valid HTTPS binding; Web Serial and WebUSB are only
+available to secure browser contexts. The included `web.config` selects
+`index.html` as the default document, registers firmware download MIME types,
+and grants the site access to the serial and USB browser capabilities.
+
+On Android, use an up-to-date Chrome release and a USB OTG data cable. The
+configurator uses WebUSB CDC directly on Android, avoiding vendor-specific
+Android Serial Service availability. Desktop Chrome and Edge continue to use
+Web Serial. iOS does not expose the wired connection used by this configurator.
+
 The configurator displays IMU telemetry, 16 SBUS channels, and motor outputs.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
