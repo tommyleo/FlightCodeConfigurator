@@ -72,6 +72,7 @@ for(let i=0;i<4;i++){
 const buttons={connect:$("#connectButton"),read:$("#readButton"),apply:$("#applyButton"),save:$("#saveButton"),reset:$("#resetButton")};
 buttons.applyProtocol=$("#applyProtocolButton");
 buttons.applyMainLoop=$("#applyMainLoopButton");
+buttons.saveVbatMultiplier=$("#saveVbatMultiplierButton");
 buttons.reboot=$("#rebootButton");
 buttons.applyAlignment=$("#applyAlignmentButton");buttons.saveAlignment=$("#saveAlignmentButton");
 buttons.applyMotorDirection=$("#applyMotorDirectionButton");
@@ -251,6 +252,7 @@ function applyCapabilities(){
   setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
   setCapabilityControls("#mainLoopHz,#applyMainLoopButton","MAIN_LOOP");
+  setCapabilityControls("#vbatMultiplier,#saveVbatMultiplierButton","VBAT_CALIBRATION");
   setCapabilityControls("#rebootButton","REBOOT");
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
@@ -301,6 +303,7 @@ function connected(value){
   document.querySelectorAll("[data-alignment]").forEach(i=>i.disabled=!value);buttons.applyAlignment.disabled=!value;buttons.saveAlignment.disabled=!value;
   $("#motorProtocol").disabled=!value;buttons.applyProtocol.disabled=!value;
   $("#mainLoopHz").disabled=!value;buttons.applyMainLoop.disabled=!value;
+  $("#vbatMultiplier").disabled=!value;buttons.saveVbatMultiplier.disabled=!value;
   buttons.reboot.disabled=!value;
   $("#motorDirection").disabled=!value;buttons.applyMotorDirection.disabled=!value;
   $("#motorIdlePercent").disabled=!value;buttons.applyMotorIdle.disabled=!value;
@@ -312,7 +315,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -843,6 +846,7 @@ function line(value){
   if(p[1]==="CAPABILITIES"){
     state.capabilities=new Set(p.slice(2));updateMotorProtocolOptions();applyCapabilities();
     if(hasCapability("MAIN_LOOP"))send("GET_MAIN_LOOP",false);
+    if(hasCapability("VBAT_CALIBRATION"))send("GET_VBAT_MULTIPLIER",false);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);if(hasCapability("BLACKBOX_CATALOG"))requestBlackboxCatalog()
     return;
@@ -964,6 +968,10 @@ async function connectWebUsb(){
   for(const port of authorized){
     try{await openSerialPort(port);return}catch{await disconnect()}
   }
+  if(p[1]==="VBAT_MULTIPLIER"){
+    const multiplier=Number(p[2]);if(Number.isFinite(multiplier))$("#vbatMultiplier").value=multiplier.toFixed(3);
+    $("#vbatMultiplierState").textContent=p[3]==="1"?"Saved to flash":"Applied · not saved";return;
+  }
   await openSerialPort(await FlightCodeWebUsbSerial.requestPort());
 }
 async function connect(){
@@ -1012,6 +1020,12 @@ buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMainLoop.onclick=async()=>{await send(`SET_MAIN_LOOP ${$("#mainLoopHz").value}`);await send("SAVE_SETTINGS");$("#mainLoopState").textContent="Saved · reboot the flight controller";toast("Main loop saved; reboot required")};
+buttons.saveVbatMultiplier.onclick=async()=>{
+  const value=Number($("#vbatMultiplier").value);
+  if(!Number.isFinite(value)||value<0.5||value>1.5){toast("VBAT multiplier: enter a value between 0.500 and 1.500");return}
+  await send(`SET_VBAT_MULTIPLIER ${value}`);await send("SAVE_SETTINGS");
+  $("#vbatMultiplierState").textContent="Saved to flash";toast("VBAT calibration saved");
+};
 buttons.reboot.onclick=async()=>{if(buttons.reboot.disabled)return;buttons.reboot.disabled=true;await send("REBOOT");toast("Rebooting flight controller…")};
 buttons.applyMotorDirection.onclick=async()=>{await send(`SET_MOTOR_DIRECTION ${$("#motorDirection").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorIdle.onclick=async()=>{

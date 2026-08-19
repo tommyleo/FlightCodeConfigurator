@@ -54,12 +54,16 @@ or disabled after connection.
 | Motor protocol, direction, idle and test | Yes | Yes | Yes | Yes |
 | Guided IMU calibration | Yes | Yes | Yes | Yes |
 | Guided PID/mixer simulation | Yes | Yes | Yes | Yes |
-| Battery voltage telemetry | Yes | Yes | Yes | Firmware dependent |
+| Battery voltage telemetry | Yes | Yes | Yes | Yes |
 | Analog OSD setup | Yes | Yes | No (HD digital board) | Firmware dependent |
 | RAM flight-log download | Yes | Yes | Yes | Yes |
 | Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | No |
 | Blackbox write/session diagnostics | No | Storage status | Yes | No |
 | Firmware update | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | RP2350 BOOTSEL/UF2 |
+
+On CLRACINGF4, FLYWOOF405NANO and FlightCodePI, Setup exposes a persistent VBAT multiplier
+for final voltage calibration. The firmware starts from Betaflight's standard
+scale 110, while the multiplier defaults to 1.000.
 
 The Flywoo Blackbox page exposes flash readiness, used bytes, dropped records,
 the retained-flight catalog, JSON download, erase, physical **Write test** and
