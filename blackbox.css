@@ -118,3 +118,44 @@
     grid-column: 1 / -1;
   }
 }
+
+@media (max-width: 550px) {
+  .blackbox-card > header,
+  .blackbox-flights-card > header {
+    flex-wrap: wrap;
+    gap: 7px 12px;
+  }
+
+  .blackbox-card > header small,
+  .blackbox-flights-card > header small {
+    flex-basis: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .blackbox-stat {
+    min-height: 0;
+    padding: 15px;
+  }
+
+  .blackbox-flight {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .blackbox-flight button {
+    grid-column: auto;
+    width: 100%;
+  }
+
+  .blackbox-card .osd-actions,
+  .blackbox-flights-card .osd-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  .blackbox-card .osd-actions,
+  .blackbox-flights-card .osd-actions {
+    grid-template-columns: 1fr;
+  }
+}

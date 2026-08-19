@@ -206,3 +206,30 @@
     display: grid;
   }
 }
+
+@media (max-width: 550px) {
+  .firmware-card {
+    padding: 16px;
+  }
+
+  .firmware-fields,
+  .firmware-file-info,
+  .firmware-sequence {
+    min-width: 0;
+  }
+
+  .firmware-fields input[type="file"] {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .firmware-actions .button {
+    width: 100%;
+  }
+
+  .firmware-log pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}

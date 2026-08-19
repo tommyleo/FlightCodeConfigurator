@@ -24,6 +24,12 @@ available to secure browser contexts. The included `web.config` selects
 `index.html` as the default document, registers firmware download MIME types,
 and grants the site access to the serial and USB browser capabilities.
 
+Regenerate the publication folder and its `web.zip` package from PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-dist.ps1
+```
+
 On Android, use an up-to-date Chrome release and a USB OTG data cable. The
 configurator uses WebUSB CDC directly on Android, avoiding vendor-specific
 Android Serial Service availability. Desktop Chrome and Edge continue to use

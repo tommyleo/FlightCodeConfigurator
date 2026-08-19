@@ -30,4 +30,76 @@
 .sbus-diagnostics{margin-bottom:18px;padding:16px;border:1px solid #56db9b66;border-radius:6px;background:linear-gradient(145deg,#10251f,var(--panel));transition:.2s}.sbus-diagnostic-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.sbus-diagnostic-heading small{color:var(--cyan);letter-spacing:1.5px}.sbus-diagnostic-heading h2{margin:4px 0 0}.sbus-diagnostic-heading b{padding:5px 9px;border-radius:4px;background:var(--green);color:#071c14;font:10px monospace;letter-spacing:1px}.sbus-diagnostic-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}.sbus-diagnostic-grid div{padding:10px;background:#071218;border:1px solid var(--line);border-radius:4px}.sbus-diagnostic-grid small{display:block;color:var(--muted);font-size:8px;letter-spacing:1px}.sbus-diagnostic-grid strong{display:block;margin-top:5px;font:15px monospace}.sbus-diagnostics p{margin:12px 0 0;color:var(--muted);font-size:11px}.sbus-diagnostics.warning{border-color:#ff6b5e99;background:linear-gradient(145deg,#301a18,var(--panel))}.sbus-diagnostics.warning .sbus-diagnostic-heading b{background:#ff6b5e;color:#210806}.sbus-diagnostics.warning #sbusUartErrors,.sbus-diagnostics.warning #sbusRecoveries,.sbus-diagnostics.warning #sbusOverruns,.sbus-diagnostics.warning #sbusInvalidFrames{color:#ff8177}.sbus-diagnostics.waiting{border-color:var(--line);background:var(--panel)}.sbus-diagnostics.waiting .sbus-diagnostic-heading b{background:#32444b;color:var(--muted)}@media(max-width:900px){.sbus-diagnostic-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:520px){.sbus-diagnostic-grid{grid-template-columns:repeat(2,1fr)}}
 .osd-safety{border:1px solid #ff8a4266;background:#2b1c12;padding:16px 18px;border-radius:6px;margin-bottom:14px}.osd-safety strong{color:var(--orange);letter-spacing:1px}.osd-safety p{margin:7px 0 0;color:#d7b69f}.osd-card{max-width:920px}.osd-position-title{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:18px 0 10px}.osd-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:14px}.osd-actions span{margin-right:auto;color:var(--muted);font-size:11px}
 .heading-title{display:flex;align-items:baseline;gap:14px}.imu-name{color:var(--cyan);font:16px monospace;letter-spacing:1px;border-left:1px solid var(--line);padding-left:14px;white-space:nowrap}
+
+/* Mobile usability pass: keep every configurator view inside the viewport and
+   provide comfortable touch targets without changing the desktop layout. */
+@media(max-width:850px){
+  .topbar{height:64px}
+  .shell{min-height:calc(100vh - 64px)}
+  aside{position:sticky;top:64px;z-index:4;align-self:start;display:flex;flex-direction:row;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:8px 10px;background:#091820f2;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  aside::-webkit-scrollbar{display:none}
+  .nav{flex:0 0 auto;min-height:44px;white-space:nowrap;scroll-snap-align:start}
+  .nav span{margin-right:9px}
+  main{min-width:0}
+  .heading{align-items:flex-start;gap:14px}
+  .heading>div{min-width:0}
+  .button,select,input:not([type="checkbox"]):not([type="range"]){min-height:44px}
+}
+
+@media(max-width:550px){
+  body{overflow-x:hidden}
+  .topbar{padding:0 10px;gap:8px}
+  .brand{gap:7px;min-width:0}
+  .brand-logo{width:38px;height:38px}
+  .brand b{font-size:15px}
+  .brand small{font-size:8px;letter-spacing:1.5px}
+  .connection{gap:7px}
+  .connection>.button{padding:9px 12px}
+  .battery-status{padding:6px 8px}
+  .battery-icon{display:none}
+  main{padding:22px 14px;overflow:hidden}
+  .heading{flex-wrap:wrap;margin-bottom:22px}
+  .heading h1{font-size:27px;line-height:1.12}
+  .heading .badge,.heading .save-state{flex:0 0 auto;max-width:100%;white-space:normal;text-align:center}
+  .heading-title{flex-wrap:wrap;gap:7px 10px}
+  .imu-name{flex-basis:100%;border-left:0;padding-left:0;font-size:14px;white-space:normal}
+  .card,.axis-card,.receiver-config,.rates-card,.tuning-profiles,.protocol-card,.motor-warning,.motor-test-panel,.imu-diagnostic,.diagnostic-help,.pid-diagnostic,.flight-log-card,.osd-safety{padding:16px}
+  .model-panel{height:min(430px,72vh)}
+  .model-camera{height:calc(100% - 30px)}
+  .loop strong{font-size:42px}
+  .triple b{font-size:18px}
+  .alignment-fields{grid-template-columns:1fr}
+  .alignment-actions,.diagnostic-actions{display:grid;grid-template-columns:1fr 1fr}
+  .alignment-actions .button,.diagnostic-actions .button{width:100%}
+  .diagnostic-actions .button:last-child:nth-child(odd){grid-column:1/-1}
+  .rates-fields,.filter-fields{grid-template-columns:1fr;max-width:none}
+  .main-loop-actions{grid-template-columns:1fr}
+  .profile-button{min-height:58px}
+  .receiver-actions,.osd-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .receiver-actions span,.osd-actions span{grid-column:1/-1;margin-right:0}
+  .receiver-actions .button,.osd-actions .button{width:100%}
+  .channels{grid-template-columns:1fr 1fr}
+  .osd-enable-row{align-items:flex-start;gap:14px}
+  .osd-enable-row>div{min-width:0}
+  .osd-positions button{min-height:44px;padding:7px 5px}
+  .motor-warning label,.diagnostic-safety{align-items:flex-start;line-height:1.4}
+  .motor-warning input[type="checkbox"],.diagnostic-safety input[type="checkbox"]{flex:0 0 20px;width:20px;height:20px;margin:0}
+  .motor-test-panel{gap:18px}
+  .motor-test-card{padding:14px 8px}
+  .vertical-motor{width:40px}
+  .protocol-control select,.protocol-control input{min-width:0;width:100%}
+  .toast{left:14px;right:14px;bottom:14px;text-align:center}
+  .console summary{min-height:44px}
+}
+
+@media(max-width:380px){
+  .brand small{display:none}
+  .brand-logo{width:34px;height:34px}
+  .connection>.button{padding-inline:10px}
+  main{padding-inline:12px}
+  .channels{grid-template-columns:1fr}
+  .motor-test-grid{grid-template-columns:1fr 1fr}
+  .osd-positions{grid-template-columns:repeat(2,1fr)}
+  .osd-positions button:last-child{grid-column:1/-1}
+}
 #receiverProtocolRow{margin-bottom:14px}
