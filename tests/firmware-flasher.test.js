@@ -12,6 +12,10 @@ assert.doesNotMatch(source, /navigator\.usb\.getDevices\(\)/);
 assert.match(source, /navigator\.usb\.requestDevice\(\{filters:\[filter\]\}\)/);
 assert.match(source, /resetAfterFlash\(\)/);
 assert.match(source, /FLYWOOF405NANO:\{label:"Flywoo GN405 Nano V3"/);
+assert.match(source, /FLYWOOF405NANO_ANALOG:\{label:"Flywoo GN405 Nano Analog"/);
+assert.match(source, /sort\(\(\[,a\],\[,b\]\)=>b\.filename\.length-a\.filename\.length\)/);
+assert.match(source, /This firmware is for \$\{fileTarget\[1\]\.label\}/);
+assert.match(source, /Expected \$\{expectedFilename\(target\)\}/);
 
 function record(address, type, data) {
   const bytes = [data.length, address >> 8, address & 0xff, type, ...data];

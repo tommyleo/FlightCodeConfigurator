@@ -57,6 +57,7 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
     MAMBAF411:{label:"Mamba F411",filename:"MAMBAF411",kind:"stm32",extension:".hex",firmwareEnd:0x08040000,sectors:[16,16,16,16,64,128,128,128]},
     CLRACINGF4:{label:"CLRacing F4",filename:"CLRACINGF4",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     FLYWOOF405NANO:{label:"Flywoo GN405 Nano V3",filename:"FLYWOOF405NANO",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
+    FLYWOOF405NANO_ANALOG:{label:"Flywoo GN405 Nano Analog",filename:"FLYWOOF405NANO_ANALOG",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     PICO2_W:{label:"Raspberry Pi Pico 2 W",filename:"FLIGHTCODEPI",kind:"pico",extension:".uf2",firmwareEnd:PICO_RESERVED_START}
   };
   const state={image:null,file:null,fileError:"",detectedBoard:"",device:null,session:null,sessionTarget:"",busy:false};
@@ -70,6 +71,11 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
   const progress=(value,text)=>{ui.progress.style.width=`${Math.max(0,Math.min(100,value))}%`;ui.progressText.textContent=text};
   function badge(text,type=""){ui.dfuState.textContent=text;ui.dfuState.className=`badge ${type}`}
   function selectedTarget(){return TARGETS[ui.target.value]||null}
+  function targetForFilename(filename){
+    const upper=filename.toUpperCase();
+    return Object.entries(TARGETS).sort(([,a],[,b])=>b.filename.length-a.filename.length).find(([,target])=>upper.includes(target.filename))||null;
+  }
+  const expectedFilename=target=>`FlightCode-${target.filename}${target.extension}`;
 
   function updateModeUi(){
     const target=selectedTarget();
@@ -92,8 +98,9 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
     if(!image)return {ok:false,message:`Select a FlightCode ${target?.extension||"firmware"} file.`};
     if(!target)return {ok:false,message:"Select the destination flight controller."};
     if(image.format!==target.extension.slice(1))return {ok:false,message:`${target.label} requires a ${target.extension.toUpperCase()} firmware file.`};
-    const upper=state.file.name.toUpperCase();
-    if(!upper.includes(target.filename))return {ok:false,message:`The filename does not identify ${target.label}.`};
+    const fileTarget=targetForFilename(state.file.name);
+    if(fileTarget&&fileTarget[0]!==ui.target.value)return {ok:false,message:`This firmware is for ${fileTarget[1].label}. Select ${expectedFilename(target)} for ${target.label}.`};
+    if(!fileTarget)return {ok:false,message:`The filename does not identify ${target.label}. Expected ${expectedFilename(target)}.`};
     if(state.detectedBoard&&state.detectedBoard!==ui.target.value)return {ok:false,message:`Connected board is ${TARGETS[state.detectedBoard]?.label||state.detectedBoard}, but ${target.label} is selected.`};
     if(target.kind==="pico"){
       if(image.start!==PICO_FLASH_START)return {ok:false,message:`FlightCodePI firmware must start at ${hex(PICO_FLASH_START)}.`};
@@ -174,7 +181,7 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
       else throw new Error("Select a FlightCode Intel HEX (.hex) or UF2 (.uf2) file");
       const image=state.image;
       ui.size.textContent=`${image.totalBytes.toLocaleString()} B`;ui.range.textContent=`${hex(image.start)} – ${hex(image.end-1)}`;
-      const filename=file.name.toUpperCase(),match=Object.entries(TARGETS).find(([,target])=>filename.includes(target.filename));
+      const match=targetForFilename(file.name);
       if(match&&!state.detectedBoard){ui.target.value=match[0];updateModeUi()}
       log(`Loaded ${file.name} · ${image.totalBytes.toLocaleString()} firmware bytes`);
     }catch(error){state.fileError=error.message;log(`File rejected: ${error.message}`)}

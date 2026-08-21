@@ -1,6 +1,14 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
 let receiverConfig={protocol:"SBUS",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),receiverProtocols:["SBUS"],receiverProtocolsReported:false,osdAvailable:false,osdPosition:"CENTER",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),receiverProtocols:["SBUS"],receiverProtocolsReported:false,osdAvailable:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const osdElements=[
+  {label:"Battery voltage",sample:"▤16.80V"},
+  {label:"Cell voltage",sample:"▤4.20V"},
+  {label:"Flight timer",sample:"03:24◷"},
+  {label:"FlightCode logo",sample:"FLIGHTCODE"},
+  {label:"Pilot name",sample:"PILOT"}
+];
+const osdLayout={mask:1,positions:[31,61,51,340,369],pilot:"PILOT",selected:0};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -21,7 +29,7 @@ const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,t
   {key:"yaw_n90",axis:"yaw",target:[0,0,-90],ms:4000,text:"Rotate the nose left to yaw -90° and hold"},
   {key:"yaw_n180",axis:"yaw",target:[0,0,-180],ms:4000,text:"Continue left to yaw -180° and hold"},
   {key:"yaw_zero_2",axis:"yaw",target:[0,0,0],ms:4000,text:"Return yaw to the starting direction"},
-  {key:"combined",axis:"combined",target:null,ms:5000,text:"Prova una posizione combinata libera su roll, pitch e yaw; non servono angoli precisi"},
+  {key:"combined",axis:"combined",target:null,ms:5000,text:"Try any combined roll, pitch, and yaw position; exact angles are not required"},
   {key:"plane_end",axis:"still",target:[0,0,0],ms:3000,text:"Finish with the quad still and level"}
 ]};
 const stationaryDiagnostic={running:false,phase:"idle",phaseStarted:0,sawCalibration:false,samples:[],file:null,
@@ -130,9 +138,10 @@ function setCapabilityControls(selector,name){
   });
 }
 function updateOsdControls(){
-  const usable=state.connected&&hasCapability("OSD");
+  const usable=state.connected&&hasCapability("OSD_LAYOUT");
   $("#osdEnabled").disabled=!usable;
-  document.querySelectorAll("[data-osd-position]").forEach(button=>button.disabled=!usable);
+  document.querySelectorAll("[data-osd-element]").forEach(button=>button.disabled=!usable);
+  $("#osdPilotName").disabled=!usable;
   $("#applyOsdButton").disabled=!usable;
   $("#saveOsdButton").disabled=!usable;
   $("#osdDetectionState").textContent=state.osdAvailable?"MAX7456 DETECTED":"NOT DETECTED";
@@ -214,10 +223,58 @@ function finishBlackboxDownload(){
   blackbox.downloading=false;blackbox.flight=null;$("#blackboxDownloadProgress").style.width="100%";
   $("#blackboxDownloadState").textContent="Download completed";updateBlackboxControls();toast("Blackbox flight downloaded");
 }
-function selectOsdPosition(position){
-  state.osdPosition=position;
-  document.querySelectorAll("[data-osd-position]").forEach(button=>button.classList.toggle("active",button.dataset.osdPosition===position));
+function osdElementText(index){return index===4?(osdLayout.pilot||"PILOT"):osdElements[index].sample}
+function setOsdVideoMode(mode){
+  state.osdRows=mode==="NTSC"?13:16;
+  const preview=$("#osdPreview");preview.style.setProperty("--osd-rows",state.osdRows);preview.style.aspectRatio=`30 / ${state.osdRows}`;
+  $("#osdGridFormat").textContent=`${mode==="NTSC"?"NTSC":"PAL"} · 30 × ${state.osdRows} GRID`;
+  $("#osdGridHelp").textContent=`Drag an element to place it. Positions snap to the ${30} × ${state.osdRows} ${mode==="NTSC"?"NTSC":"PAL"} grid.`;
+  renderOsdLayout();
 }
+function renderOsdLayout(){
+  const container=$("#osdPreviewItems");container.replaceChildren();
+  osdElements.forEach((element,index)=>{
+    const position=osdLayout.positions[index],row=Math.floor(position/30),column=position%30,text=osdElementText(index),cellCount=Math.min(12,text.length);
+    const item=document.createElement("div");item.className=`osd-preview-item${osdLayout.mask&(1<<index)?"":" disabled"}${osdLayout.selected===index?" selected":""}`;
+    item.dataset.osdElement=index;item.draggable=true;item.style.gridTemplateColumns=`repeat(${cellCount},1fr)`;
+    item.style.width=`${cellCount/30*100}%`;item.replaceChildren(...Array.from(text.slice(0,cellCount),character=>{const cell=document.createElement("span");cell.textContent=character===" "?"\u00a0":character;return cell}));
+    item.style.left=`${column/30*100}%`;item.style.top=`${row/state.osdRows*100}%`;item.classList.toggle("outside-video",row>=state.osdRows);
+    container.append(item);
+  });
+  document.querySelectorAll("[data-osd-element].osd-palette-item").forEach(button=>{
+    const index=Number(button.dataset.osdElement),outside=Math.floor(osdLayout.positions[index]/30)>=state.osdRows;button.classList.toggle("enabled",Boolean(osdLayout.mask&(1<<index)));button.classList.toggle("selected",osdLayout.selected===index);button.classList.toggle("outside-video",outside);button.title=outside?"This element is outside the visible video grid. Drag it back into the preview.":"";
+  });
+  $("#osdPilotName").value=osdLayout.pilot;$("#osdPilotPreview").textContent=osdLayout.pilot||"PILOT";
+}
+function setOsdLayout(mask,positions,pilot,saved=false){
+  osdLayout.mask=mask&31;osdLayout.positions=positions.map(value=>Math.max(0,Math.min(479,Number(value)||0)));
+  osdLayout.pilot=(pilot||"").replaceAll("_"," ").toUpperCase().replace(/[^A-Z0-9 -]/g,"").slice(0,12);
+  state.osdDirty=false;renderOsdLayout();$("#osdConfigState").textContent=saved?"Saved to flash":"Unsaved changes";
+}
+function placeOsdElement(index,clientX,clientY){
+  if(!state.connected||!hasCapability("OSD_LAYOUT"))return;
+  const preview=$("#osdPreview"),rect=preview.getBoundingClientRect(),text=osdElementText(index);
+  const maxColumn=Math.max(0,30-Math.min(12,text.length));
+  const column=Math.max(0,Math.min(maxColumn,Math.floor((clientX-rect.left)/rect.width*30)));
+  const row=Math.max(0,Math.min(state.osdRows-1,Math.floor((clientY-rect.top)/rect.height*state.osdRows)));
+  osdLayout.positions[index]=row*30+column;osdLayout.mask|=1<<index;osdLayout.selected=index;
+  const lastColumn=column+Math.min(12,text.length);
+  $("#osdGridPosition").textContent=`COL ${column+1}–${lastColumn} · ROW ${row+1}`;markOsdDirty();renderOsdLayout();
+}
+document.querySelectorAll(".osd-palette-item").forEach(button=>{
+  button.onclick=()=>{const index=Number(button.dataset.osdElement);osdLayout.selected=index;osdLayout.mask^=1<<index;markOsdDirty();renderOsdLayout()};
+  button.ondragstart=event=>{const index=Number(button.dataset.osdElement);event.dataTransfer.setData("text/osd-element",String(index));event.dataTransfer.effectAllowed="copyMove";osdLayout.selected=index;renderOsdLayout()};
+});
+const osdPreview=$("#osdPreview");
+osdPreview.ondragover=event=>{event.preventDefault();osdPreview.classList.add("drag-over")};
+osdPreview.ondragleave=()=>osdPreview.classList.remove("drag-over");
+osdPreview.ondrop=event=>{event.preventDefault();osdPreview.classList.remove("drag-over");const index=Number(event.dataTransfer.getData("text/osd-element"));if(index>=0&&index<osdElements.length)placeOsdElement(index,event.clientX,event.clientY)};
+osdPreview.ondragstart=event=>{const item=event.target.closest(".osd-preview-item");if(item)event.dataTransfer.setData("text/osd-element",item.dataset.osdElement)};
+let osdPointerElement=null;
+osdPreview.onpointerdown=event=>{const item=event.target.closest(".osd-preview-item");osdPointerElement=item?Number(item.dataset.osdElement):osdLayout.selected;if(osdPointerElement===null)return;osdPreview.setPointerCapture(event.pointerId);placeOsdElement(osdPointerElement,event.clientX,event.clientY)};
+osdPreview.onpointermove=event=>{if(osdPointerElement!==null)placeOsdElement(osdPointerElement,event.clientX,event.clientY)};
+osdPreview.onpointerup=osdPreview.onpointercancel=()=>{osdPointerElement=null};
+renderOsdLayout();
 function updateMotorProtocolOptions(){
   const values=state.board==="PICO2_W"
     ?[["DSHOT300","DSHOT300"],["DSHOT600","DSHOT600"],["DSHOT1200","DSHOT1200"]]
@@ -315,7 +372,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;selectOsdPosition("CENTER");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -335,7 +392,7 @@ async function enterDfuMode(){
 }
 window.flightCodeConfigurator={
   board:()=>state.board,
-  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","PICO2_W"].includes(state.board),
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","PICO2_W"].includes(state.board),
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
@@ -713,22 +770,22 @@ function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const val
 function setRates(values){["rollRate","pitchRate","yawRate"].forEach((id,i)=>$(`#${id}`).value=Number(values[i]).toFixed(0));$("#rateExpo").value=Number(values[3]).toFixed(2)}
 function getRates(){
   const values=["rollRate","pitchRate","yawRate","rateExpo"].map(id=>Number($(`#${id}`).value));
-  if(values.slice(0,3).some(v=>!Number.isFinite(v)||v<100||v>1200))throw new Error("I rate devono essere tra 100 e 1200 °/s");
-  if(!Number.isFinite(values[3])||values[3]<0||values[3]>0.9)throw new Error("Expo deve essere tra 0 e 0,9");
+  if(values.slice(0,3).some(v=>!Number.isFinite(v)||v<100||v>1200))throw new Error("Rates must be between 100 and 1200 °/s");
+  if(!Number.isFinite(values[3])||values[3]<0||values[3]>0.9)throw new Error("Expo must be between 0 and 0.9");
   return {roll:values[0],pitch:values[1],yaw:values[2],expo:values[3]};
 }
 function ratesCommand(){const r=getRates();return `SET_RATES ${r.roll} ${r.pitch} ${r.yaw} ${r.expo}`}
 function setFeedforward(values){axes.forEach(([key],i)=>$(`#${key}FF`).value=Number(values[i]).toFixed(3))}
 function getFeedforward(){
   const values=axes.map(([key])=>Number($(`#${key}FF`).value));
-  if(values.some(v=>!Number.isFinite(v)||v<0||v>1))throw new Error("Feedforward deve essere tra 0 e 1");
+  if(values.some(v=>!Number.isFinite(v)||v<0||v>1))throw new Error("Feedforward must be between 0 and 1");
   return {roll:values[0],pitch:values[1],yaw:values[2]};
 }
 function feedforwardCommand(){const f=getFeedforward();return `SET_FEEDFORWARD ${f.roll} ${f.pitch} ${f.yaw}`}
 function setTpa(values){$("#tpaAttenuation").value=Number(values[0]).toFixed(0);$("#tpaBreakpoint").value=Number(values[1]).toFixed(0)}
 function getTpa(){
   const attenuation=Number($("#tpaAttenuation").value),breakpoint=Number($("#tpaBreakpoint").value);
-  if(!Number.isFinite(attenuation)||attenuation<0||attenuation>100||!Number.isFinite(breakpoint)||breakpoint<0||breakpoint>100)throw new Error("TPA e soglia devono essere tra 0% e 100%");
+  if(!Number.isFinite(attenuation)||attenuation<0||attenuation>100||!Number.isFinite(breakpoint)||breakpoint<0||breakpoint>100)throw new Error("TPA and breakpoint must be between 0% and 100%");
   return {attenuation,breakpoint};
 }
 function tpaCommand(){const t=getTpa();return `SET_TPA ${t.attenuation/100} ${t.breakpoint}`}
@@ -754,17 +811,22 @@ function applyTuningProfile(name){
 document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.onclick=()=>applyTuningProfile(button.dataset.tuningProfile));
 document.querySelectorAll("[data-pid],[data-rate],[data-feedforward],[data-tpa],[data-filter]").forEach(input=>input.addEventListener("input",()=>setActiveTuningProfile(null)));
 function setAlignment(values){$("#boardRoll").value=Number(values[0]).toFixed(1);$("#boardPitch").value=Number(values[1]).toFixed(1);$("#boardYaw").value=Number(values[2]).toFixed(1)}
-function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{const value=Number($(`#${id}`).value);if(!Number.isFinite(value)||value < -180||value > 180)throw new Error("Gli angoli devono essere compresi tra -180° e +180°");return value})}
+function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{const value=Number($(`#${id}`).value);if(!Number.isFinite(value)||value < -180||value > 180)throw new Error("Angles must be between -180° and +180°");return value})}
 function line(value){
   log(value);if(!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}
   if(p[1]==="OSD_STATUS"){
     const wasAvailable=state.osdAvailable,available=p[2]==="1";state.osdAvailable=available;
-    if(!state.osdDirty){$("#osdEnabled").checked=p[3]==="1";selectOsdPosition(p[4]||"CENTER");$("#osdConfigState").textContent=p[9]==="1"?"Saved to flash":"Unsaved changes"}updateOsdControls();
+    if(!state.osdDirty)$("#osdEnabled").checked=p[3]==="1";updateOsdControls();
+    setOsdVideoMode(p[5]||"PAL");
     $("#osdDetectionState").textContent=state.osdAvailable?`DETECTED · ${p[6]||"FONT ?"}`:`NOT DETECTED · OSDM 0x${p[7]||"??"}`;
     $("#osdDetectionState").title=`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
+  }
+  if(p[1]==="OSD_LAYOUT"&&p.length>=10){
+    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,8).map(Number),p[8]==="-"?"":p[8],p[9]==="1");
+    return
   }
   if(p[1]==="BLACKBOX_STATUS"){
     state.blackboxState=p[2]||"ERROR";
@@ -847,6 +909,7 @@ function line(value){
     state.capabilities=new Set(p.slice(2));updateMotorProtocolOptions();applyCapabilities();
     if(hasCapability("MAIN_LOOP"))send("GET_MAIN_LOOP",false);
     if(hasCapability("VBAT_CALIBRATION"))send("GET_VBAT_MULTIPLIER",false);
+    if(hasCapability("OSD_LAYOUT"))send("GET_OSD_LAYOUT",false);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);if(hasCapability("BLACKBOX_CATALOG"))requestBlackboxCatalog()
     return;
@@ -855,9 +918,13 @@ function line(value){
   if(p[1]==="IMU"){
     const available=p.at(-1)==="1",name=p.slice(2,-1).join(" ");
     state.imuName=name;$("#diagnosticImuName").textContent=name||"IMU —";
+    if(!state.gyroRateHz){state.gyroRateHz=name.includes("MPU6000")?8000:name.includes("ICM42688")?16000:0;$("#gyroRateHz").textContent=state.gyroRateHz?`${state.gyroRateHz/1000} kHz`:"—"}
     $("#deviceName").textContent=`FlightCode · ${state.board} · ${name}`;
     if(!available)toast(`IMU not detected: ${name}`);
     return;
+  }
+  if(p[1]==="GYRO_RATE"){
+    const hz=Number(p[2]);state.gyroRateHz=[8000,16000].includes(hz)?hz:0;$("#gyroRateHz").textContent=state.gyroRateHz?`${state.gyroRateHz/1000} kHz`:"—";return;
   }
   if(p[1]==="FLIGHT_LOG_INFO"){
     flightLog.count=Number(p[2])||0;flightLog.rate=Number(p[3])||200;flightLog.recording=p[4]==="1";
@@ -1034,12 +1101,13 @@ buttons.applyMotorIdle.onclick=async()=>{
   await send(`SET_MOTOR_IDLE ${value}`);await send("SAVE_SETTINGS");
 };
 buttons.applyReceiver.onclick=async()=>{try{await send(receiverCommand())}catch(error){toast(error.message)}};
-function osdCommand(){return `SET_OSD ${$("#osdEnabled").checked?1:0} ${state.osdPosition}`}
+function osdCommand(){return `SET_OSD_ENABLED ${$("#osdEnabled").checked?1:0}`}
+function osdLayoutCommand(){const pilot=(osdLayout.pilot||"-").replaceAll(" ","_");return `SET_OSD_LAYOUT ${osdLayout.mask} ${osdLayout.positions.join(" ")} ${pilot}`}
 function markOsdDirty(){state.osdDirty=true;$("#osdConfigState").textContent="Local changes"}
-document.querySelectorAll("[data-osd-position]").forEach(button=>button.onclick=()=>{selectOsdPosition(button.dataset.osdPosition);markOsdDirty()});
 $("#osdEnabled").onchange=markOsdDirty;
-$("#applyOsdButton").onclick=async()=>{await send(osdCommand());state.osdDirty=false;$("#osdConfigState").textContent="Applied · not saved"};
-$("#saveOsdButton").onclick=async()=>{await send(osdCommand());await send("SAVE_SETTINGS");state.osdDirty=false;$("#osdConfigState").textContent="Saved to flash"};
+$("#osdPilotName").oninput=event=>{osdLayout.pilot=event.target.value.toUpperCase().replace(/[^A-Z0-9 -]/g,"").slice(0,12);osdLayout.mask|=1<<4;osdLayout.selected=4;markOsdDirty();renderOsdLayout()};
+$("#applyOsdButton").onclick=async()=>{await send(osdCommand());await send(osdLayoutCommand());state.osdDirty=false;$("#osdConfigState").textContent="Applied · not saved"};
+$("#saveOsdButton").onclick=async()=>{await send(osdCommand());await send(osdLayoutCommand());await send("SAVE_SETTINGS");state.osdDirty=false;$("#osdConfigState").textContent="Saved to flash"};
 function blackboxCommand(){return `SET_BLACKBOX ${$("#blackboxEnabled").checked?1:0}`}
 $("#blackboxEnabled").onchange=()=>{state.blackboxDirty=true;$("#blackboxConfigState").textContent="Local changes"};
 $("#refreshBlackboxButton").onclick=()=>{send("GET_BLACKBOX_STATUS");requestBlackboxCatalog()};

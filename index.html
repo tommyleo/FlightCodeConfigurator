@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
   <title>FlightCode Configurator</title>
-  <link rel="stylesheet" href="styles.css?v=20260819-2">
+  <link rel="stylesheet" href="styles.css?v=20260821-3">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
   <link rel="stylesheet" href="firmware-flasher.css?v=20260819-2">
@@ -44,7 +44,7 @@
             </div></div></div>
             <div class="legend"><span>ROLL</span><span>PITCH</span><span>YAW</span></div>
           </article>
-          <article class="card main-loop-card"><header>MAIN LOOP <small>REBOOT REQUIRED</small></header><label for="mainLoopHz">Control and gyro scheduler</label><select id="mainLoopHz" disabled><option value="8000">8 kHz</option><option value="16000" selected>16 kHz</option></select><div class="main-loop-actions"><button id="applyMainLoopButton" class="button secondary" disabled>Save for reboot</button><button id="rebootButton" class="button primary" disabled>Reboot</button></div><p id="mainLoopState">Waiting for board settings</p></article>
+          <article class="card main-loop-card"><header>MAIN LOOP <small>REBOOT REQUIRED</small></header><div class="main-loop-schedulers"><label for="mainLoopHz">Main loop scheduler (motors and PID)<select id="mainLoopHz" disabled><option value="8000">8 kHz</option><option value="16000" selected>16 kHz</option></select></label><div class="gyro-rate-field"><span>Gyro frequency</span><output id="gyroRateHz">—</output></div></div><div class="main-loop-actions"><button id="applyMainLoopButton" class="button secondary" disabled>Save for reboot</button><button id="rebootButton" class="button primary" disabled>Reboot</button></div><p id="mainLoopState">Waiting for board settings</p></article>
           <article class="card vbat-card"><header>VBAT CALIBRATION <small>SCALE 110</small></header><label for="vbatMultiplier">Final voltage multiplier</label><div class="vbat-control"><input id="vbatMultiplier" type="number" min="0.5" max="1.5" step="0.001" value="1.000" disabled><button id="saveVbatMultiplierButton" class="button primary" disabled>Save</button></div><p id="vbatMultiplierState">Waiting for board settings</p></article>
           </div>
           <div class="telemetry">
@@ -205,13 +205,26 @@
           <p>For reliable detection, power the flight controller from the LiPo first, then connect USB. The MAX7456 may not be powered by USB alone.</p>
         </article>
         <article class="card osd-card">
-          <header>VOLTAGE OVERLAY <small>MAX7456</small></header>
-          <div class="osd-enable-row"><div><b>Enable voltage overlay</b><small>The firmware applies it when the OSD hardware becomes available.</small></div><label class="osd-switch"><input id="osdEnabled" type="checkbox" disabled><span></span></label></div>
-          <h2 class="osd-position-title">Voltage position</h2>
-          <div id="osdPositions" class="osd-positions" aria-label="Voltage position">
-            <button type="button" data-osd-position="TOP_LEFT" disabled>Top left</button><button type="button" data-osd-position="TOP_CENTER" disabled>Top center</button><button type="button" data-osd-position="TOP_RIGHT" disabled>Top right</button>
-            <button type="button" data-osd-position="CENTER_LEFT" disabled>Center left</button><button type="button" data-osd-position="CENTER" class="active" disabled>Center</button><button type="button" data-osd-position="CENTER_RIGHT" disabled>Center right</button>
-            <button type="button" data-osd-position="BOTTOM_LEFT" disabled>Bottom left</button><button type="button" data-osd-position="BOTTOM_CENTER" disabled>Bottom center</button><button type="button" data-osd-position="BOTTOM_RIGHT" disabled>Bottom right</button>
+          <header>OSD LAYOUT <small id="osdGridFormat">PAL · 30 × 16 GRID</small></header>
+          <div class="osd-enable-row"><div><b>Enable OSD overlay</b><small>Choose the visible elements and drag them directly over the video preview.</small></div><label class="osd-switch"><input id="osdEnabled" type="checkbox" disabled><span></span></label></div>
+          <div class="osd-layout-editor">
+            <div id="osdPalette" class="osd-palette" aria-label="OSD elements">
+              <div class="osd-palette-heading"><small>ELEMENTS</small><span>SHOW</span></div>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="0"><span><b>Battery voltage</b><small>▤16.80V</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="1"><span><b>Cell voltage</b><small>▤4.20V</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="2"><span><b>Flight timer</b><small>03:24◷</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="3"><span><b>FlightCode logo</b><small>FLIGHTCODE</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="4"><span><b>Pilot name</b><small id="osdPilotPreview">PILOT</small></span><i aria-hidden="true"></i></button>
+              <label class="osd-pilot-field"><span>Pilot name</span><input id="osdPilotName" maxlength="12" placeholder="PILOT" autocomplete="off" disabled></label>
+            </div>
+            <div class="osd-preview-wrap">
+              <div class="osd-preview-toolbar"><span>CAMERA PREVIEW</span><b id="osdGridPosition">COL — · ROW —</b></div>
+              <div id="osdPreview" class="osd-preview" role="application" aria-label="OSD positioning preview">
+                <div id="osdPreviewItems"></div>
+                <div class="osd-safe-area"></div>
+              </div>
+              <p id="osdGridHelp">Drag an element to place it. Positions snap to the detected video grid.</p>
+            </div>
           </div>
           <div class="osd-actions"><span id="osdConfigState">Waiting for board settings</span><button id="applyOsdButton" class="button secondary" disabled>Apply</button><button id="saveOsdButton" class="button primary" disabled>Save</button></div>
         </article>
@@ -315,7 +328,7 @@
         </article>
         <article class="firmware-card">
           <div class="firmware-fields">
-            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
+            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="FLYWOOF405NANO_ANALOG">Flywoo GN405 Nano Analog</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
             <label><small id="firmwareFileTypeLabel">LOCAL FIRMWARE</small><input id="firmwareFile" type="file" accept=".hex,.uf2,text/plain,application/octet-stream"></label>
           </div>
           <div class="firmware-file-info">
@@ -350,7 +363,7 @@
   <script src="blackbox-logic.js?v=20260805-3"></script>
   <script src="serial-port-logic.js?v=20260809-1"></script>
   <script src="webusb-serial.js?v=20260817-2"></script>
-  <script src="app.js?v=20260817-2"></script>
+  <script src="app.js?v=20260821-3"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>

@@ -40,8 +40,8 @@ It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
 On CLRACINGF4, the Blackbox page lists microSD flights retained across power
-cycles. On FLYWOOF405NANO it manages the internal 16 MiB flash and its latest
-retained flight. Both targets download indexed flights as FlightCode JSON logs
+cycles. On both Flywoo Nano targets it manages the internal 16 MiB flash and
+its latest retained flight. These targets download indexed flights as FlightCode JSON logs
 and provide a protected catalog-clear action. FlightCodePI does not expose
 persistent Blackbox storage.
 
@@ -50,24 +50,24 @@ persistent Blackbox storage.
 The interface is capability-driven: unsupported pages and controls are hidden
 or disabled after connection.
 
-| Configurator feature | MAMBAF411 | CLRACINGF4 | FLYWOOF405NANO | FlightCodePI |
-| --- | --- | --- | --- | --- |
-| PID, rates, expo, FF, TPA | Yes | Yes | Yes | Yes |
-| Balanced/Racing/Freestyle profiles | Yes | Yes | Yes | Yes |
-| Gyro and D-term filters | Yes | Yes | Yes | Yes |
-| Board alignment and live attitude | Yes | Yes | Yes | Yes |
-| SBUS channel view and receiver setup | Yes | Yes | Yes | Firmware dependent |
-| Motor protocol, direction, idle and test | Yes | Yes | Yes | Yes |
-| Guided IMU calibration | Yes | Yes | Yes | Yes |
-| Guided PID/mixer simulation | Yes | Yes | Yes | Yes |
-| Battery voltage telemetry | Yes | Yes | Yes | Yes |
-| Analog OSD setup | Yes | Yes | No (HD digital board) | Firmware dependent |
-| RAM flight-log download | Yes | Yes | Yes | Yes |
-| Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | No |
-| Blackbox write/session diagnostics | No | Storage status | Yes | No |
-| Firmware update | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | RP2350 BOOTSEL/UF2 |
+| Configurator feature | MAMBAF411 | CLRACINGF4 | FLYWOOF405NANO | FLYWOOF405NANO_ANALOG | FlightCodePI |
+| --- | --- | --- | --- | --- | --- |
+| PID, rates, expo, FF, TPA | Yes | Yes | Yes | Yes | Yes |
+| Balanced/Racing/Freestyle profiles | Yes | Yes | Yes | Yes | Yes |
+| Gyro and D-term filters | Yes | Yes | Yes | Yes | Yes |
+| Board alignment and live attitude | Yes | Yes | Yes | Yes | Yes |
+| SBUS channel view and receiver setup | Yes | Yes | Yes | Yes | Firmware dependent |
+| Motor protocol, direction, idle and test | Yes | Yes | Yes | Yes | Yes |
+| Guided IMU calibration | Yes | Yes | Yes | Yes | Yes |
+| Guided PID/mixer simulation | Yes | Yes | Yes | Yes | Yes |
+| Battery voltage telemetry | Yes | Yes | Yes | Yes | Yes |
+| Analog OSD layout editor | Drag-and-drop, 5 elements | Drag-and-drop, 5 elements | No (HD digital board) | Drag-and-drop, 5 elements | Firmware dependent |
+| RAM flight-log download | Yes | Yes | Yes | Yes | Yes |
+| Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | 16 MiB internal flash, latest flight | No |
+| Blackbox write/session diagnostics | No | Storage status | Yes | Yes | No |
+| Firmware update | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | RP2350 BOOTSEL/UF2 |
 
-On CLRACINGF4, FLYWOOF405NANO and FlightCodePI, Setup exposes a persistent VBAT multiplier
+On CLRACINGF4, both Flywoo Nano targets and FlightCodePI, Setup exposes a persistent VBAT multiplier
 for final voltage calibration. The firmware starts from Betaflight's standard
 scale 110, while the multiplier defaults to 1.000.
 
@@ -95,7 +95,7 @@ flash address so storage faults can be diagnosed without flying.
 The **Firmware** tab detects the connected board and selects its matching
 bootloader and firmware format:
 
-- MAMBAF411, CLRACINGF4, and FLYWOOF405NANO use STM32 DFU with a matching
+- MAMBAF411, CLRACINGF4, FLYWOOF405NANO, and FLYWOOF405NANO_ANALOG use STM32 DFU with a matching
   FlightCode `.hex` file.
 - Raspberry Pi Pico 2 W uses RP2350 Picoboot with a FlightCodePI `.uf2` file.
 
