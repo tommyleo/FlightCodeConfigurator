@@ -209,7 +209,7 @@ function startBlackboxDownload(flightId){
 function finishBlackboxDownload(){
   const flight=blackbox.flight;
   const metadata=flight.metadata;
-  const file={format:"FlightCode-Flight-Log",version:6,source:"persistent Blackbox",flightId:flight.id,
+  const file={format:"FlightCode-Flight-Log",version:7,source:"persistent Blackbox",flightId:flight.id,
     created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||200,
     alignment:metadata?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:metadata?.motorDirection||$("#motorDirection").value,
@@ -723,7 +723,7 @@ function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
   const m=flightLog.metadata;
-  const file={format:"FlightCode-Flight-Log",version:6,created:new Date().toISOString(),
+  const file={format:"FlightCode-Flight-Log",version:7,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",sampleRateHz:m?.logRateHz||flightLog.rate,
     alignment:m?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:m?.motorDirection||$("#motorDirection").value,rates:m?.rates||getRates(),
@@ -865,9 +865,9 @@ function line(value){
   if(p[1]==="BLACKBOX_CATALOG_END"){
     renderBlackboxFlights();return
   }
-  if(p[1]==="BLACKBOX_LOG"&&blackbox.downloading&&p.length>=21){
+  if(p[1]==="BLACKBOX_LOG"&&blackbox.downloading&&p.length>=33){
     const flightId=Number(p[2]),index=Number(p[3]),values=p.slice(4).map(Number);
-    if(blackbox.flight?.id===flightId)blackbox.records.push(decodeLogRecord(values,index));return
+    const record=decodeLogRecord(values,index);if(record&&blackbox.flight?.id===flightId)blackbox.records.push(record);return
   }
   if(p[1]==="BLACKBOX_METADATA_CORE"&&blackbox.downloading){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
@@ -975,9 +975,9 @@ function line(value){
     $("#blackboxWriteTestResult").className="diagnostic-result";
     return;
   }
-  if(p[1]==="FLIGHT_LOG"&&flightLog.downloading&&p.length>=19){
+  if(p[1]==="FLIGHT_LOG"&&flightLog.downloading&&p.length>=32){
     const n=p.slice(3).map(Number),index=Number(p[2]);
-    flightLog.records.push(decodeLogRecord(n,index,flightLog.rate));return;
+    const record=decodeLogRecord(n,index,flightLog.rate);if(record)flightLog.records.push(record);return;
   }
   if(p[1]==="FLIGHT_LOG_CHUNK_END"&&flightLog.downloading){
     const next=Number(p[2]);

@@ -6,16 +6,22 @@ const FlightCodeBlackboxLogic=(()=>{
   }
 
   function decodeRecord(values,index,rate=200){
-    const flags=values[14];
+    if(values.length<29)return null;
+    const flags=values[11],mainLoopUs=values[12],gyroLoopUs=values[13];
+    const pTerm=values.slice(17,20).map(v=>v/2),iTerm=values.slice(20,23).map(v=>v/2);
+    const dTerm=values.slice(23,26).map(v=>v/2),ffTerm=values.slice(26,29).map(v=>v/2);
+    const pid=pTerm.map((value,axis)=>{
+      const limit=axis===2?25:35,sum=value+iTerm[axis]+dTerm[axis]+ffTerm[axis];
+      return Number(Math.max(-limit,Math.min(limit,sum)).toFixed(2));
+    });
     return {t:Number((index/rate).toFixed(5)),gyro:values.slice(0,3).map(v=>v/10),
-      setpoint:values.slice(3,6).map(v=>v/10),pid:values.slice(6,9).map(v=>v/2),
-      motors:values.slice(9,13).map(v=>Number((v*100/255).toFixed(2))),
-      throttle:values[13]/2,mixerSaturated:(flags&1)!==0,stopReason:stopReasonName(flags),loopUs:values[15],
-      batteryVoltage:values.length>=19?values[16]/100:0,cellVoltage:values.length>=19?values[17]/100:0,
-      batteryCells:values.length>=19?values[18]:0,pTerm:values.length>=28?values.slice(19,22).map(v=>v/2):[0,0,0],
-      iTerm:values.length>=28?values.slice(22,25).map(v=>v/2):[0,0,0],
-      dTerm:values.length>=28?values.slice(25,28).map(v=>v/2):[0,0,0],
-      ffTerm:values.length>=31?values.slice(28,31).map(v=>v/2):[0,0,0]};
+      setpoint:values.slice(3,6).map(v=>v/10),pid,
+      motors:values.slice(6,10).map(v=>Number((v*100/255).toFixed(2))),
+      throttle:values[10]/2,mixerSaturated:(flags&1)!==0,stopReason:stopReasonName(flags),
+      mainLoopUs,mainLoopHz:mainLoopUs?Number((1000000/mainLoopUs).toFixed(2)):0,
+      gyroLoopUs,gyroLoopHz:gyroLoopUs?Number((1000000/gyroLoopUs).toFixed(2)):0,
+      batteryVoltage:values[14]/100,cellVoltage:values[15]/100,batteryCells:values[16],
+      pTerm,iTerm,dTerm,ffTerm};
   }
 
   return {stopReasonName,decodeRecord};

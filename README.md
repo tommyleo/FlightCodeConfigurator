@@ -88,8 +88,8 @@ flash address so storage faults can be diagnosed without flying.
 - View live attitude, gyro, receiver, motor, battery and loop telemetry.
 - Run protected motor, guided IMU and simulated PID/mixer tests while disarmed.
 - Download RAM or persistent Blackbox logs as versioned FlightCode JSON,
-  including setpoints, gyro, motors, battery, PID update interval and separated
-  P/I/D/FF terms.
+  including setpoints, gyro, motors, battery, measured main-scheduler and
+  gyro/PID periods and frequencies, plus separated P/I/D/FF terms.
 - Request DFU/BOOTSEL from a connected controller or enter it manually with the
   board BOOT button when USB reset is unavailable.
 
