@@ -816,6 +816,10 @@ function line(value){
   log(value);if(!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}
+  if(p[1]==="VBAT_MULTIPLIER"){
+    const multiplier=Number(p[2]);if(Number.isFinite(multiplier))$("#vbatMultiplier").value=multiplier.toFixed(3);
+    $("#vbatMultiplierState").textContent=p[3]==="1"?"Saved to flash":"Applied · not saved";return;
+  }
   if(p[1]==="OSD_STATUS"){
     const wasAvailable=state.osdAvailable,available=p[2]==="1";state.osdAvailable=available;
     if(!state.osdDirty)$("#osdEnabled").checked=p[3]==="1";updateOsdControls();
@@ -1034,10 +1038,6 @@ async function connectWebUsb(){
   const authorized=await FlightCodeWebUsbSerial.authorizedPorts();
   for(const port of authorized){
     try{await openSerialPort(port);return}catch{await disconnect()}
-  }
-  if(p[1]==="VBAT_MULTIPLIER"){
-    const multiplier=Number(p[2]);if(Number.isFinite(multiplier))$("#vbatMultiplier").value=multiplier.toFixed(3);
-    $("#vbatMultiplierState").textContent=p[3]==="1"?"Saved to flash":"Applied · not saved";return;
   }
   await openSerialPort(await FlightCodeWebUsbSerial.requestPort());
 }

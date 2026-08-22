@@ -44,11 +44,11 @@
             </div></div></div>
             <div class="legend"><span>ROLL</span><span>PITCH</span><span>YAW</span></div>
           </article>
-          <article class="card main-loop-card"><header>MAIN LOOP <small>REBOOT REQUIRED</small></header><div class="main-loop-schedulers"><label for="mainLoopHz">Main loop scheduler (motors and PID)<select id="mainLoopHz" disabled><option value="8000">8 kHz</option><option value="16000" selected>16 kHz</option></select></label><div class="gyro-rate-field"><span>Gyro frequency</span><output id="gyroRateHz">—</output></div></div><div class="main-loop-actions"><button id="applyMainLoopButton" class="button secondary" disabled>Save for reboot</button><button id="rebootButton" class="button primary" disabled>Reboot</button></div><p id="mainLoopState">Waiting for board settings</p></article>
+          <article class="card main-loop-card"><header>MAIN SCHEDULER <small>REBOOT REQUIRED</small></header><div class="main-loop-schedulers"><label for="mainLoopHz">Scheduler rate (motors and system tasks)<select id="mainLoopHz" disabled><option value="8000">8 kHz</option><option value="16000" selected>16 kHz</option></select></label><div class="gyro-rate-field"><span>Gyro / PID rate</span><output id="gyroRateHz">—</output></div></div><div class="main-loop-actions"><button id="applyMainLoopButton" class="button secondary" disabled>Save for reboot</button><button id="rebootButton" class="button primary" disabled>Reboot</button></div><p id="mainLoopState">Waiting for board settings</p></article>
           <article class="card vbat-card"><header>VBAT CALIBRATION <small>SCALE 110</small></header><label for="vbatMultiplier">Final voltage multiplier</label><div class="vbat-control"><input id="vbatMultiplier" type="number" min="0.5" max="1.5" step="0.001" value="1.000" disabled><button id="saveVbatMultiplierButton" class="button primary" disabled>Save</button></div><p id="vbatMultiplierState">Waiting for board settings</p></article>
           </div>
           <div class="telemetry">
-            <article class="card loop"><header>CONTROL LOOP <small>LIVE</small></header><strong id="loopFrequency">—</strong><span>Hz</span><p>Maximum period: <b id="loopMaxPeriod">—</b> µs</p></article>
+            <article class="card loop"><header>MAIN SCHEDULER <small>LIVE</small></header><strong id="loopFrequency">—</strong><span>Hz</span><p>Maximum period: <b id="loopMaxPeriod">—</b> µs</p></article>
             <article class="card"><header>GYROSCOPE <small>°/s</small></header><div class="triple">
               <div><small>ROLL</small><b id="gyroRoll">0.0</b></div><div><small>PITCH</small><b id="gyroPitch">0.0</b><small id="gyroPitchRaw">RAW: —</small></div><div><small>YAW</small><b id="gyroYaw">0.0</b></div>
             </div></article>
@@ -302,7 +302,7 @@
         <header class="heading"><div><small>ONBOARD STORAGE</small><h1>Blackbox</h1></div><b id="blackboxState" class="badge">UNAVAILABLE</b></header>
         <article class="card blackbox-card">
           <header>LONG FLIGHT LOGGING <small>MICROSD / INTERNAL FLASH</small></header>
-          <div class="osd-enable-row"><div><b>Enable persistent Blackbox</b><small>Records gyro, setpoints, separated P/I/D/FF terms, motors, battery and loop timing at 200 Hz.</small></div><label class="osd-switch"><input id="blackboxEnabled" type="checkbox" disabled><span></span></label></div>
+          <div class="osd-enable-row"><div><b>Enable persistent Blackbox</b><small>Records gyro, setpoints, separated P/I/D/FF terms, motors, battery and PID update interval at 200 Hz.</small></div><label class="osd-switch"><input id="blackboxEnabled" type="checkbox" disabled><span></span></label></div>
           <div class="blackbox-stats">
             <div class="blackbox-stat"><small>STORAGE CAPACITY</small><strong id="blackboxCapacity">—</strong><span id="blackboxCapacityDetail">Blackbox storage</span></div>
             <div class="blackbox-stat"><small>STORED FLIGHT DATA</small><strong id="blackboxStored">—</strong><span id="blackboxWrittenDetail">0 B written this power session</span></div>

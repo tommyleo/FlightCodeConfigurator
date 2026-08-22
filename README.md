@@ -36,6 +36,9 @@ Android Serial Service availability. Desktop Chrome and Edge continue to use
 Web Serial. iOS does not expose the wired connection used by this configurator.
 
 The configurator displays IMU telemetry, 16 SBUS channels, and motor outputs.
+Setup distinguishes the selectable main-scheduler frequency from the live
+gyroscope/PID frequency. PID updates are synchronized to fresh gyroscope
+samples, while motor output and timed system tasks follow the main scheduler.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
@@ -85,7 +88,7 @@ flash address so storage faults can be diagnosed without flying.
 - View live attitude, gyro, receiver, motor, battery and loop telemetry.
 - Run protected motor, guided IMU and simulated PID/mixer tests while disarmed.
 - Download RAM or persistent Blackbox logs as versioned FlightCode JSON,
-  including setpoints, gyro, motors, battery, loop timing and separated
+  including setpoints, gyro, motors, battery, PID update interval and separated
   P/I/D/FF terms.
 - Request DFU/BOOTSEL from a connected controller or enter it manually with the
   board BOOT button when USB reset is unavailable.
