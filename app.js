@@ -1,14 +1,19 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-let receiverConfig={protocol:"SBUS",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),receiverProtocols:["SBUS"],receiverProtocolsReported:false,osdAvailable:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
+let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
+const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
+vtxTables.HDZERO={R:[5658,5695,5732,5769,5806,5843,5880,5917],E:[5705,0,0,0,0,0,0,0],F:[5740,5760,0,5800,0,0,0,0],L:[5362,5399,5436,5473,5510,5547,5584,5621]};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const osdElements=[
   {label:"Battery voltage",sample:"▤16.80V"},
   {label:"Cell voltage",sample:"▤4.20V"},
   {label:"Flight timer",sample:"03:24◷"},
   {label:"FlightCode logo",sample:"FLIGHTCODE"},
   {label:"Pilot name",sample:"PILOT"}
+  ,{label:"VTX band / channel",sample:"VTX R1"}
+  ,{label:"VTX power",sample:"VTX 25MW"}
 ];
-const osdLayout={mask:1,positions:[31,61,51,340,369],pilot:"PILOT",selected:0};
+const osdLayout={mask:1,positions:[31,61,51,340,369,55,85],pilot:"PILOT",selected:0};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -86,6 +91,7 @@ buttons.applyAlignment=$("#applyAlignmentButton");buttons.saveAlignment=$("#save
 buttons.applyMotorDirection=$("#applyMotorDirectionButton");
 buttons.applyMotorIdle=$("#applyMotorIdleButton");
 buttons.applyReceiver=$("#applyReceiverConfigButton");buttons.saveReceiver=$("#saveReceiverConfigButton");
+buttons.applyVtx=$("#applyVtxButton");buttons.saveVtx=$("#saveVtxButton");
 function updateReceiverLabels(){
   const primary=receiverConfig.order==="AETR1234"?["Roll","Pitch","Throttle","Yaw"]:["Throttle","Roll","Pitch","Yaw"];
   for(let i=0;i<16;i++)$(`#channelName${i}`).textContent=primary[i]||`AUX${i-3}`;
@@ -97,7 +103,8 @@ function updateModeRange(i){
   const left=(min-900)/12,width=(max-min)/12;$(`#modeRangeActive${i}`).style.cssText=`left:${left}%;width:${width}%`;$(`#modeRangeValue${i}`).textContent=`${min}–${max} µs`;
 }
 function setReceiverConfig(config,saved=false){
-  receiverConfig=config;$("#receiverProtocol").value=config.protocol||"SBUS";$("#receiverChannelOrder").value=config.order;updateReceiverProtocolUi();
+  receiverConfig={...config,port:config.port||"UART1"};$("#receiverProtocol").value=receiverConfig.protocol||"SBUS";$("#receiverSerialPort").value=receiverConfig.port;$("#receiverChannelOrder").value=receiverConfig.order;updateReceiverProtocolUi();
+  state.activeReceiverProtocol=receiverConfig.protocol||"SBUS";state.activeReceiverPort=receiverConfig.port;
   config.modes.forEach((mode,i)=>{$(`#modeFunction${i}`).value=mode.fn;$(`#modeChannel${i}`).value=mode.channel;$(`#modeMin${i}`).value=mode.min;$(`#modeMax${i}`).value=mode.max;updateModeRange(i)});
   $("#receiverConfigState").textContent=saved?"Saved to flash":"Unsaved changes";updateReceiverLabels();
 }
@@ -105,13 +112,19 @@ function getReceiverConfig(){
   const modes=[0,1].map(i=>({fn:$(`#modeFunction${i}`).value,channel:Number($(`#modeChannel${i}`).value),min:Number($(`#modeMin${i}`).value),max:Number($(`#modeMax${i}`).value)}));
   if(new Set(modes.map(m=>m.fn)).size!==2)throw new Error("Select ARM and BEEP once each");
   if(modes.some(m=>m.min>=m.max))throw new Error("Each mode needs a valid minimum and maximum");
-  return {protocol:$("#receiverProtocol").value,order:$("#receiverChannelOrder").value,modes};
+  return {protocol:$("#receiverProtocol").value,port:$("#receiverSerialPort").value,order:$("#receiverChannelOrder").value,modes};
 }
 function updateReceiverProtocolUi(){const protocol=$("#receiverProtocol").value;$("#receiverInputType").textContent=`INPUT / ${protocol}`;$("#receiverDiagnosticsType").textContent=`${protocol} DIAGNOSTICS`;$("#sbusDiagnosticMessage").textContent=`Waiting for ${protocol} receiver diagnostics…`}
 function setReceiverProtocols(protocols,reported=true){state.receiverProtocols=protocols.length?protocols:["SBUS"];state.receiverProtocolsReported=reported;const select=$("#receiverProtocol"),selected=state.receiverProtocols.includes(receiverConfig.protocol)?receiverConfig.protocol:state.receiverProtocols[0];select.replaceChildren(...state.receiverProtocols.map(protocol=>new Option(protocol==="ELRS"?"ELRS (CRSF)":protocol,protocol)));select.value=selected;receiverConfig.protocol=selected;updateReceiverProtocolUi()}
-function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn==="ARM"),beep=c.modes.find(m=>m.fn==="BEEP"),protocol=state.receiverProtocolsReported?`${c.protocol} `:"";return `SET_RECEIVER_CONFIG ${protocol}${c.order} ${arm.channel} ${arm.min} ${arm.max} ${beep.channel} ${beep.min} ${beep.max}`}
+function setSerialPorts(ports){state.serialPorts=ports.length?ports:["UART1"];[$("#receiverSerialPort"),$("#vtxSerialPort")].forEach(select=>{const selected=select.value;select.replaceChildren(...state.serialPorts.map(port=>new Option(port,port)));select.value=state.serialPorts.includes(selected)?selected:state.serialPorts[0]});receiverConfig.port=$("#receiverSerialPort").value;vtxConfig.port=$("#vtxSerialPort").value;validateSerialAssignments()}
+function validateSerialAssignments(){const conflict=$("#vtxProtocol").value!=="OFF"&&$("#receiverSerialPort").value===$("#vtxSerialPort").value,usable=state.connected&&hasCapability("VTX_CONFIG"),hdzero=$("#vtxProtocol").value==="HDZERO_MSP",table=hdzero?vtxTables.HDZERO:vtxTables[$("#vtxTable").value],band=$("#vtxBand"),selectedBand=band.value;band.replaceChildren(...Object.keys(table).map(value=>new Option(value,value)));band.value=Object.hasOwn(table,selectedBand)?selectedBand:Object.keys(table)[0];const frequencies=table[band.value],channel=$("#vtxChannel"),selectedChannel=Number(channel.value)||1;channel.replaceChildren(...frequencies.map((frequency,index)=>new Option(frequency?`CH ${index+1} · ${frequency} MHz`:`CH ${index+1} · unavailable`,index+1)));channel.value=frequencies[selectedChannel-1]?selectedChannel:frequencies.findIndex(Boolean)+1;[...channel.options].forEach((option,index)=>option.disabled=!frequencies[index]);const power=$("#vtxPower"),selectedPower=Number(power.value),powers=hdzero?[25,200]:[25,100,200,400,500,600,1000];power.replaceChildren(...powers.map(value=>new Option(`${value} mW`,value)));power.value=powers.includes(selectedPower)?selectedPower:powers[0];buttons.applyVtx.disabled=!usable||conflict;buttons.saveVtx.disabled=!usable||conflict;$("#vtxConfigState").textContent=conflict?"UART already assigned to receiver":"Unsaved changes";$("#vtxTable").disabled=!usable||hdzero;$("#vtxTable").title=hdzero?"HDZero uses its built-in channel table":"";renderVtxTable()}
+function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn==="ARM"),beep=c.modes.find(m=>m.fn==="BEEP"),protocol=state.receiverProtocolsReported?`${c.protocol} ${c.port} `:"";return `SET_RECEIVER_CONFIG ${protocol}${c.order} ${arm.channel} ${arm.min} ${arm.max} ${beep.channel} ${beep.min} ${beep.max}`}
 [0,1].forEach(i=>{$(`#modeMin${i}`).oninput=()=>updateModeRange(i);$(`#modeMax${i}`).oninput=()=>updateModeRange(i)});setReceiverConfig(receiverConfig);
 $("#receiverProtocol").onchange=()=>{updateReceiverProtocolUi();$("#receiverConfigState").textContent="Unsaved changes"};
+function renderVtxTable(){const hdzero=$("#vtxProtocol").value==="HDZERO_MSP",region=hdzero?"HDZERO":$("#vtxTable").value,table=vtxTables[region],first=Object.values(table)[0];$("#vtxTableTitle").textContent=hdzero?"HDZero Race V3 frequency table":`${region} frequency table`;$("#vtxFrequencyTable").innerHTML=`<table><thead><tr><th>Band</th>${first.map((_,i)=>`<th>CH ${i+1}</th>`).join("")}</tr></thead><tbody>${Object.entries(table).map(([band,frequencies])=>`<tr><th>${band}</th>${frequencies.map(f=>`<td class="${f?"":"disabled"}">${f||"—"}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
+function setVtxConfig(config,saved=false){vtxConfig={...vtxConfig,...config};$("#vtxProtocol").value=vtxConfig.protocol;$("#vtxSerialPort").value=vtxConfig.port;$("#vtxTable").value=vtxConfig.table;validateSerialAssignments();$("#vtxBand").value=vtxConfig.band;validateSerialAssignments();$("#vtxChannel").value=vtxConfig.channel;$("#vtxPower").value=vtxConfig.power;$("#vtxConfigState").textContent=saved?"Saved to flash":"Unsaved changes";renderVtxTable()}
+function vtxCommand(){return `SET_VTX_CONFIG ${$("#vtxProtocol").value} ${$("#vtxSerialPort").value} ${$("#vtxTable").value} ${$("#vtxBand").value} ${$("#vtxChannel").value} ${$("#vtxPower").value}`}
+document.querySelectorAll("[data-vtx-config]").forEach(el=>el.onchange=()=>{$("#vtxConfigState").textContent="Unsaved changes";if(el.id==="vtxTable")renderVtxTable();validateSerialAssignments()});$("#receiverSerialPort").addEventListener("change",validateSerialAssignments);renderVtxTable();
 function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}View`));document.querySelectorAll(".nav").forEach(v=>v.classList.toggle("active",v.dataset.view===name))}
 document.querySelectorAll(".nav").forEach(v=>v.onclick=()=>view(v.dataset.view));
 function badge(el,text,type=""){el.textContent=text;el.className=`badge ${type}`}
@@ -314,6 +327,9 @@ function applyCapabilities(){
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
   setCapabilityControls("[data-receiver-config],#applyReceiverConfigButton,#saveReceiverConfigButton","RECEIVER_CONFIG");
+  setCapabilityControls("[data-vtx-config],#applyVtxButton,#saveVtxButton","VTX_CONFIG");
+  badge($("#vtxState"),hasCapability("VTX_CONFIG")?"READY":"UNAVAILABLE",hasCapability("VTX_CONFIG")?"online":"");
+  validateSerialAssignments();
   setCapabilityControls("#motorSafetyCheck","MOTOR_TEST");
   setCapabilityControls("#startImuDiagnosticButton","TELEMETRY");
   setCapabilityControls("#startStationaryDiagnosticButton","GYRO_CALIBRATION");
@@ -332,7 +348,8 @@ function applyCapabilities(){
   updateRebootButton();
   if(!state.connected){state.imuName="";$("#diagnosticImuName").textContent="IMU —"}
 }
-function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;window.firmwareFlasher?.updateReady?.()}
+function sbusBlocksDfu(){return state.signal&&state.activeReceiverProtocol==="SBUS"&&state.activeReceiverPort==="UART1"}
+function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;button.title=sbusBlocksDfu()?"Turn off the transmitter before entering DFU":"";window.firmwareFlasher?.updateReady?.()}
 function updateRebootButton(){buttons.reboot.disabled=!state.connected||!hasCapability("REBOOT")||state.armed||state.motorTest}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
 function updateConnectionText(){
@@ -387,6 +404,7 @@ function log(line,direction="RX"){
 async function send(command,visible=true){if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
 async function enterDfuMode(){
   if(!state.connected||!hasCapability("DFU")||state.armed||state.motorTest)throw new Error("Bootloader restart requires a connected, disarmed board with motor test disabled");
+  if(sbusBlocksDfu())throw new Error("Active SBUS signal detected on UART1. Turn off the transmitter before entering DFU.");
   $("#enterDfuButton").disabled=true;
   await send("ENTER_DFU");
 }
@@ -745,7 +763,7 @@ function telemetry(parts){
   const wasArmed=state.armed,wasCalibrated=state.calibrated,wasSignal=state.signal,firstTelemetry=!state.telemetrySeen;
   if(firstTelemetry)resetAttitude();
   state.armed=armed;state.signal=signal;state.telemetrySeen=true;
-  if(firstTelemetry||wasArmed!==armed){updateDfuButton();updateRebootButton()}
+  if(firstTelemetry||wasArmed!==armed||wasSignal!==signal){updateDfuButton();updateRebootButton()}
   if(wasArmed&&!armed)setTimeout(()=>{send("GET_FLIGHT_LOG_INFO",false);if(hasCapability("BLACKBOX_SD")){send("GET_BLACKBOX_STATUS",false);requestBlackboxCatalog()}},250);
   if(!firstTelemetry&&calibrated&&!wasCalibrated)toast("Gyroscope calibration completed");
   state.calibrated=calibrated;
@@ -828,8 +846,12 @@ function line(value){
     $("#osdDetectionState").title=`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
   }
+  if(p[1]==="OSD_LAYOUT"&&p.length>=12){
+    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,10).map(Number),p[10]==="-"?"":p[10],p[11]==="1");
+    return
+  }
   if(p[1]==="OSD_LAYOUT"&&p.length>=10){
-    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,8).map(Number),p[8]==="-"?"":p[8],p[9]==="1");
+    if(!state.osdDirty)setOsdLayout(Number(p[2]),[...p.slice(3,8).map(Number),55,85],p[8]==="-"?"":p[8],p[9]==="1");
     return
   }
   if(p[1]==="BLACKBOX_STATUS"){
@@ -918,6 +940,7 @@ function line(value){
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);if(hasCapability("BLACKBOX_CATALOG"))requestBlackboxCatalog()
     return;
   }
+  if(p[1]==="SERIAL_PORTS"){setSerialPorts(p.slice(2));return}
   if(p[1]==="RECEIVER_PROTOCOLS"){setReceiverProtocols(p.slice(2),true);return}
   if(p[1]==="IMU"){
     const available=p.at(-1)==="1",name=p.slice(2,-1).join(" ");
@@ -990,9 +1013,13 @@ function line(value){
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
   if(p[1]==="FILTERS"&&p.length>=5){setFilters(p.slice(2,4));saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
-  if(p[1]==="RECEIVER_CONFIG"&&p.length>=11){setReceiverConfig({protocol:p[2],order:p[3],modes:[{fn:"ARM",channel:Number(p[4]),min:Number(p[5]),max:Number(p[6])},{fn:"BEEP",channel:Number(p[7]),min:Number(p[8]),max:Number(p[9])}]},p[10]==="1");return}
+  if(p[1]==="VTX_CONFIG"&&p.length>=9){setVtxConfig({protocol:p[2],port:p[3],table:p[4],band:p[5],channel:Number(p[6]),power:Number(p[7])},p[8]==="1");return}
+  if(p[1]==="VTX_CONFIG"&&p.length>=6){setVtxConfig({protocol:p[2],port:p[3],table:p[4]},p[5]==="1");return}
+  if(p[1]==="RECEIVER_CONFIG"&&p.length>=12){setReceiverConfig({protocol:p[2],port:p[3],order:p[4],modes:[{fn:"ARM",channel:Number(p[5]),min:Number(p[6]),max:Number(p[7])},{fn:"BEEP",channel:Number(p[8]),min:Number(p[9]),max:Number(p[10])}]},p[11]==="1");return}
+  if(p[1]==="RECEIVER_CONFIG"&&p.length>=11){setReceiverConfig({protocol:p[2],port:"UART1",order:p[3],modes:[{fn:"ARM",channel:Number(p[4]),min:Number(p[5]),max:Number(p[6])},{fn:"BEEP",channel:Number(p[7]),min:Number(p[8]),max:Number(p[9])}]},p[10]==="1");return}
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({protocol:"SBUS",order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
   if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
+  if(p[1]==="VTX_STATUS"&&p.length>=3){const labels={APPLIED:"VTX confirmed at startup",NO_RESPONSE:"No response from VTX at startup. This may be normal if the battery is not connected and the VTX is not powered.",RACE_LOCKED:"VTX race lock is enabled",NOT_CONFIRMED:"VTX did not confirm frequency / power",UART_ERROR:"Selected UART is unavailable",INVALID_SETTINGS:"Invalid VTX settings",NOT_CONFIGURED:"VTX control is disabled"};$("#vtxConfigState").textContent=labels[p[2]]||`VTX status: ${p[2]}`;return}
   if(p[1]==="MOTOR_PROTOCOL"){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
     $("#motorProtocol").value=p[2];return;
@@ -1081,7 +1108,7 @@ async function disconnect(){
   finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
-buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG")};
+buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG");if(hasCapability("VTX_CONFIG"))await send("GET_VTX_CONFIG")};
 buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand())}catch(error){toast(error.message)}};
 buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
@@ -1100,7 +1127,8 @@ buttons.applyMotorIdle.onclick=async()=>{
   if(!Number.isFinite(value)||value<1||value>10){toast("Motor idle: enter a value between 1% and 10%");return}
   await send(`SET_MOTOR_IDLE ${value}`);await send("SAVE_SETTINGS");
 };
-buttons.applyReceiver.onclick=async()=>{try{await send(receiverCommand())}catch(error){toast(error.message)}};
+buttons.applyReceiver.onclick=async()=>{try{const config=getReceiverConfig();await send(receiverCommand());state.activeReceiverProtocol=config.protocol;state.activeReceiverPort=config.port;updateDfuButton()}catch(error){toast(error.message)}};
+buttons.applyVtx.onclick=async()=>{try{await send(vtxCommand());$("#vtxConfigState").textContent="Applied in RAM · save and reboot"}catch(error){toast(error.message)}};
 function osdCommand(){return `SET_OSD_ENABLED ${$("#osdEnabled").checked?1:0}`}
 function osdLayoutCommand(){const pilot=(osdLayout.pilot||"-").replaceAll(" ","_");return `SET_OSD_LAYOUT ${osdLayout.mask} ${osdLayout.positions.join(" ")} ${pilot}`}
 function markOsdDirty(){state.osdDirty=true;$("#osdConfigState").textContent="Local changes"}
@@ -1128,7 +1156,8 @@ $("#clearBlackboxButton").onclick=async()=>{
   if(!confirm("Erase the Blackbox flight catalog? Stored flights will no longer be downloadable."))return;
   await send("CLEAR_BLACKBOX");blackbox.flights=[];renderBlackboxFlights();$("#blackboxDownloadState").textContent="Flight catalog erased";
 };
-buttons.saveReceiver.onclick=async()=>{try{await send(receiverCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
+buttons.saveReceiver.onclick=async()=>{try{const config=getReceiverConfig();await send(receiverCommand());await send("SAVE_SETTINGS");state.activeReceiverProtocol=config.protocol;state.activeReceiverPort=config.port;updateDfuButton()}catch(error){toast(error.message)}};
+buttons.saveVtx.onclick=async()=>{try{await send(vtxCommand());await send("SAVE_SETTINGS");$("#vtxConfigState").textContent="Saved to flash · reboot required"}catch(error){toast(error.message)}};
 buttons.applyAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);resetAttitude()}catch(error){toast(error.message)}};
 buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);await send("SAVE_SETTINGS");resetAttitude()}catch(error){toast(error.message)}};
 $("#resetAttitudeButton").onclick=resetAttitude;
@@ -1151,7 +1180,7 @@ $("#downloadPidDiagnosticButton").onclick=downloadPidDiagnostic;
 $("#refreshFlightLogButton").onclick=()=>send("GET_FLIGHT_LOG_INFO");
 $("#downloadFlightLogButton").onclick=startFlightLogDownload;
 $("#enterDfuButton").onclick=async()=>{
-  await enterDfuMode();
+  try{await enterDfuMode()}catch(error){toast(error.message)}
 };
 document.querySelectorAll("[data-pid]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));
 document.querySelectorAll("[data-rate]").forEach(input=>input.oninput=()=>saveState("Local changes","dirty"));

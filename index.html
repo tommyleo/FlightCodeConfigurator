@@ -27,9 +27,10 @@
       <button class="nav" data-view="pid"><span>03</span>PID Tuning</button>
       <button class="nav" data-view="motors"><span>04</span>Motors</button>
       <button class="nav" data-view="osd"><span>05</span>Camera OSD</button>
-      <button class="nav" data-view="diagnostic"><span>06</span>IMU Diagnostics</button>
-      <button class="nav" data-view="blackbox"><span>07</span>Blackbox</button>
-      <button class="nav" data-view="firmware"><span>08</span>Firmware</button>
+      <button class="nav" data-view="vtx"><span>06</span>VTX</button>
+      <button class="nav" data-view="diagnostic"><span>07</span>IMU Diagnostics</button>
+      <button class="nav" data-view="blackbox"><span>08</span>Blackbox</button>
+      <button class="nav" data-view="firmware"><span>09</span>Firmware</button>
       <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b><small id="protocolText">USB serial</small></div></div>
     </aside>
     <main>
@@ -79,6 +80,7 @@
         <header class="heading"><div><small id="receiverInputType">INPUT / SBUS</small><h1>Receiver channels</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
         <article class="receiver-config">
           <div id="receiverProtocolRow" class="receiver-order"><label for="receiverProtocol"><small>RECEIVER TYPE</small>Serial protocol</label><select id="receiverProtocol" data-receiver-config disabled><option value="SBUS">SBUS</option></select></div>
+          <div class="receiver-order"><label for="receiverSerialPort"><small>SERIAL PORT</small>Receiver UART</label><select id="receiverSerialPort" data-receiver-config disabled><option value="UART1">UART1</option></select></div>
           <div class="receiver-order"><label for="receiverChannelOrder"><small>CHANNEL MAP</small>First four channels</label><select id="receiverChannelOrder" data-receiver-config disabled><option>TAER1234</option><option>AETR1234</option></select></div>
           <div id="receiverModes" class="receiver-modes"></div>
           <div class="receiver-actions"><span id="receiverConfigState">Waiting for board settings</span><button id="applyReceiverConfigButton" class="button secondary" disabled>Apply</button><button id="saveReceiverConfigButton" class="button primary" disabled>Save</button></div>
@@ -97,6 +99,26 @@
         </article>
         <h2 class="channel-output-title">Live channel output</h2>
         <div id="channelGrid" class="channels"></div>
+      </section>
+      <section id="vtxView" class="view">
+        <header class="heading"><div><small>VIDEO / TRANSMITTER CONTROL</small><h1>VTX</h1></div><b id="vtxState" class="badge">UNAVAILABLE</b></header>
+        <article class="vtx-card">
+          <div class="vtx-fields">
+            <label>Protocol<select id="vtxProtocol" data-vtx-config disabled><option value="OFF">Disabled</option><option value="SMARTAUDIO">SmartAudio</option><option value="TRAMP">IRC Tramp</option><option value="HDZERO_MSP">HDZero V3 · MSP + DisplayPort</option></select></label>
+            <label>Serial port<select id="vtxSerialPort" data-vtx-config disabled><option value="UART3">UART3</option><option value="UART4">UART4</option><option value="UART6">UART6</option></select></label>
+            <label>Frequency table<select id="vtxTable" data-vtx-config disabled><option value="EU">EU / CE</option><option value="US">US / FCC</option></select></label>
+            <label>Band<select id="vtxBand" data-vtx-config disabled><option>A</option><option>B</option><option>E</option><option>F</option><option>R</option></select></label>
+            <label>Channel<select id="vtxChannel" data-vtx-config disabled><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option></select></label>
+            <label>Power<select id="vtxPower" data-vtx-config disabled><option value="25">25 mW</option><option value="100">100 mW</option><option value="200">200 mW</option><option value="400">400 mW</option><option value="500">500 mW</option><option value="600">600 mW</option><option value="1000">1000 mW</option></select></label>
+          </div>
+          <p class="vtx-note">Connect the VTX control wire to the TX pad of the selected UART. VTX settings are transmitted during the next firmware startup.</p>
+          <div class="vtx-actions"><span id="vtxConfigState">Waiting for board settings</span><button id="applyVtxButton" class="button secondary" disabled>Apply (RAM)</button><button id="saveVtxButton" class="button primary" disabled>Save for reboot</button></div>
+        </article>
+        <article class="vtx-card">
+          <header><div><small>READY TO USE</small><h2 id="vtxTableTitle">EU frequency table</h2></div><b>5.8 GHz</b></header>
+          <div id="vtxFrequencyTable" class="vtx-table-wrap"></div>
+          <p class="vtx-warning">Frequencies set to “—” are disabled for the selected region. Also verify the supported bands and power levels in the VTX manufacturer documentation.</p>
+        </article>
       </section>
       <section id="pidView" class="view">
         <header class="heading"><div><small>FLIGHT TUNING / RATE MODE</small><h1>PID parameters</h1></div><b id="saveState" class="save-state">Not connected</b></header>
@@ -215,6 +237,8 @@
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="2"><span><b>Flight timer</b><small>03:24◷</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="3"><span><b>FlightCode logo</b><small>FLIGHTCODE</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="4"><span><b>Pilot name</b><small id="osdPilotPreview">PILOT</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="5"><span><b>VTX band / channel</b><small>VTX R1</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="6"><span><b>VTX power</b><small>VTX 25MW</small></span><i aria-hidden="true"></i></button>
               <label class="osd-pilot-field"><span>Pilot name</span><input id="osdPilotName" maxlength="12" placeholder="PILOT" autocomplete="off" disabled></label>
             </div>
             <div class="osd-preview-wrap">
