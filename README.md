@@ -30,6 +30,31 @@ Regenerate the publication folder and its `web.zip` package from PowerShell:
 powershell -ExecutionPolicy Bypass -File .\build-dist.ps1
 ```
 
+## Unified desktop, web and Android build
+
+The Android application embeds the same HTML, CSS and JavaScript sources used
+by the web configurator. Its native USB bridge supplies CDC serial access to
+the shared application, so configuration, telemetry, diagnostics and log
+downloads do not require Web Serial or WebUSB support from Android WebView.
+
+Build every distributable with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-all.ps1
+```
+
+The command regenerates `dist`, creates `output/desktop` and `desktop.zip`,
+synchronizes `output/mobile`, and, when Gradle and the Android SDK are
+available, creates `output/FlightCodeConfigurator-debug.apk`. Use
+`-SkipAndroidBuild` to generate and synchronize all source folders on a machine
+without the Android toolchain. The `android` folder can also be opened and built
+directly in Android Studio.
+
+Firmware flashing remains available in the web/desktop build. The Android app
+currently provides the complete CDC configurator connection; native STM32 DFU
+and RP2350 Picoboot flashing require the planned bootloader extension to the
+Android USB bridge.
+
 On Android, use an up-to-date Chrome release and a USB OTG data cable. The
 configurator uses WebUSB CDC directly on Android, avoiding vendor-specific
 Android Serial Service availability. Desktop Chrome and Edge continue to use

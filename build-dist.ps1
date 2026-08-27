@@ -19,6 +19,7 @@ $publishFiles = @(
     "quad-renderer.js",
     "serial-port-logic.js",
     "webusb-serial.js",
+    "android-usb-serial.js",
     "web.config"
 )
 

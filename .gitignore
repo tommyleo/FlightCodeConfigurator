@@ -9,6 +9,12 @@ node_modules/
 dist/
 build/
 coverage/
+output/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/upload-keystore.jks
+android/release-signing.properties
 
 # Logs and local environment
 *.log

@@ -1,0 +1,19 @@
+.model-panel {
+  height: 620px;
+}
+
+.model-camera {
+  width: calc(100% - 40px);
+  height: calc(100% - 48px);
+}
+
+@media (max-width: 550px) {
+  .model-panel {
+    height: 430px;
+  }
+
+  .model-camera {
+    width: calc(100% - 20px);
+    height: calc(100% - 36px);
+  }
+}
