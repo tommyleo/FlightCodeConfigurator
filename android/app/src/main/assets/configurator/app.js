@@ -86,7 +86,6 @@ const buttons={connect:$("#connectButton"),read:$("#readButton"),apply:$("#apply
 buttons.applyProtocol=$("#applyProtocolButton");
 buttons.applyMainLoop=$("#applyMainLoopButton");
 buttons.saveVbatMultiplier=$("#saveVbatMultiplierButton");
-buttons.reboot=$("#rebootButton");
 buttons.applyAlignment=$("#applyAlignmentButton");buttons.saveAlignment=$("#saveAlignmentButton");
 buttons.applyMotorDirection=$("#applyMotorDirectionButton");
 buttons.applyMotorIdle=$("#applyMotorIdleButton");
@@ -321,9 +320,8 @@ function applyCapabilities(){
   setCapabilityControls("[data-filter]","FILTERS");
   setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
-  setCapabilityControls("#mainLoopHz,#applyMainLoopButton","MAIN_LOOP");
+  setCapabilityControls("#mainLoopHz","MAIN_LOOP");
   setCapabilityControls("#vbatMultiplier,#saveVbatMultiplierButton","VBAT_CALIBRATION");
-  setCapabilityControls("#rebootButton","REBOOT");
   setCapabilityControls("#motorDirection,#applyMotorDirectionButton","MOTOR_DIRECTION");
   setCapabilityControls("#motorIdlePercent,#applyMotorIdleButton","MOTOR_IDLE");
   setCapabilityControls("[data-receiver-config],#applyReceiverConfigButton,#saveReceiverConfigButton","RECEIVER_CONFIG");
@@ -345,12 +343,12 @@ function applyCapabilities(){
   [buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(element=>element.disabled=!state.connected||!hasCapability("PIDS"));
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
   updateDfuButton();
-  updateRebootButton();
+  updateMainLoopButton();
   if(!state.connected){state.imuName="";$("#diagnosticImuName").textContent="IMU —"}
 }
 function sbusBlocksDfu(){return state.signal&&state.activeReceiverProtocol==="SBUS"&&state.activeReceiverPort==="UART1"}
 function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;button.title=sbusBlocksDfu()?"Turn off the transmitter before entering DFU":"";window.firmwareFlasher?.updateReady?.()}
-function updateRebootButton(){buttons.reboot.disabled=!state.connected||!hasCapability("REBOOT")||state.armed||state.motorTest}
+function updateMainLoopButton(){buttons.applyMainLoop.disabled=!state.connected||!hasCapability("MAIN_LOOP")||!hasCapability("REBOOT")||state.armed||state.motorTest}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
 function updateConnectionText(){
   $("#connectionText").textContent=!state.connected?"Board not connected":
@@ -376,9 +374,8 @@ function connected(value){
   document.querySelectorAll("[data-tuning-profile]").forEach(i=>i.disabled=!value);
   document.querySelectorAll("[data-alignment]").forEach(i=>i.disabled=!value);buttons.applyAlignment.disabled=!value;buttons.saveAlignment.disabled=!value;
   $("#motorProtocol").disabled=!value;buttons.applyProtocol.disabled=!value;
-  $("#mainLoopHz").disabled=!value;buttons.applyMainLoop.disabled=!value;
+  $("#mainLoopHz").disabled=!value;updateMainLoopButton();
   $("#vbatMultiplier").disabled=!value;buttons.saveVbatMultiplier.disabled=!value;
-  buttons.reboot.disabled=!value;
   $("#motorDirection").disabled=!value;buttons.applyMotorDirection.disabled=!value;
   $("#motorIdlePercent").disabled=!value;buttons.applyMotorIdle.disabled=!value;
   $("#motorSafetyCheck").disabled=!value;
@@ -763,7 +760,7 @@ function telemetry(parts){
   const wasArmed=state.armed,wasCalibrated=state.calibrated,wasSignal=state.signal,firstTelemetry=!state.telemetrySeen;
   if(firstTelemetry)resetAttitude();
   state.armed=armed;state.signal=signal;state.telemetrySeen=true;
-  if(firstTelemetry||wasArmed!==armed||wasSignal!==signal){updateDfuButton();updateRebootButton()}
+  if(firstTelemetry||wasArmed!==armed||wasSignal!==signal){updateDfuButton();updateMainLoopButton()}
   if(wasArmed&&!armed)setTimeout(()=>{send("GET_FLIGHT_LOG_INFO",false);if(hasCapability("BLACKBOX_SD")){send("GET_BLACKBOX_STATUS",false);requestBlackboxCatalog()}},250);
   if(!firstTelemetry&&calibrated&&!wasCalibrated)toast("Gyroscope calibration completed");
   state.calibrated=calibrated;
@@ -1118,14 +1115,23 @@ buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PID
 buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
-buttons.applyMainLoop.onclick=async()=>{await send(`SET_MAIN_LOOP ${$("#mainLoopHz").value}`);await send("SAVE_SETTINGS");$("#mainLoopState").textContent="Saved · reboot the flight controller";toast("Main loop saved; reboot required")};
+buttons.applyMainLoop.onclick=async()=>{
+  if(buttons.applyMainLoop.disabled)return;
+  buttons.applyMainLoop.disabled=true;
+  try{
+    await send(`SET_MAIN_LOOP ${$("#mainLoopHz").value}`);
+    await send("SAVE_SETTINGS");
+    $("#mainLoopState").textContent="Saved · rebooting the flight controller";
+    await send("REBOOT");
+    toast("Settings saved; rebooting flight controller…");
+  }catch(error){toast(error.message);updateMainLoopButton()}
+};
 buttons.saveVbatMultiplier.onclick=async()=>{
   const value=Number($("#vbatMultiplier").value);
   if(!Number.isFinite(value)||value<0.5||value>1.5){toast("VBAT multiplier: enter a value between 0.500 and 1.500");return}
   await send(`SET_VBAT_MULTIPLIER ${value}`);await send("SAVE_SETTINGS");
   $("#vbatMultiplierState").textContent="Saved to flash";toast("VBAT calibration saved");
 };
-buttons.reboot.onclick=async()=>{if(buttons.reboot.disabled)return;buttons.reboot.disabled=true;await send("REBOOT");toast("Rebooting flight controller…")};
 buttons.applyMotorDirection.onclick=async()=>{await send(`SET_MOTOR_DIRECTION ${$("#motorDirection").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMotorIdle.onclick=async()=>{
   const value=Number($("#motorIdlePercent").value);
