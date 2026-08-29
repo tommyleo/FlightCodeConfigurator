@@ -902,14 +902,14 @@ function line(value){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
     const c=f.metadataParts.core,t=f.metadataParts.tuning,ps=f.metadataParts.pids;
     if(c&&t&&ps)f.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10]},alignment:t.slice(11,14),motorIdlePercent:t[14]};
-    send(`GET_BLACKBOX_CHUNK ${f.id} 0 4`,false);return
+    send(`GET_BLACKBOX_CHUNK ${f.id} 0 16`,false);return
   }
-  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){send(`GET_BLACKBOX_CHUNK ${blackbox.flight.id} 0 4`,false);return}
+  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){send(`GET_BLACKBOX_CHUNK ${blackbox.flight.id} 0 16`,false);return}
   if(p[1]==="BLACKBOX_CHUNK_END"&&blackbox.downloading){
     const flightId=Number(p[2]),next=Number(p[3]),total=blackbox.flight.records;
     if(blackbox.flight.id!==flightId)return;
     $("#blackboxDownloadProgress").style.width=`${100*Math.min(next,total)/total}%`;
-    if(next<total)send(`GET_BLACKBOX_CHUNK ${flightId} ${next} 4`,false);else finishBlackboxDownload();return
+    if(next<total)send(`GET_BLACKBOX_CHUNK ${flightId} ${next} 16`,false);else finishBlackboxDownload();return
   }
   if(p[1]==="SBUS_DIAGNOSTICS"&&p.length>=9){
     const valid=p[2]==="1",age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
