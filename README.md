@@ -4,6 +4,19 @@ Shared Web Serial configurator for FlightCode firmware on STM32F4 and
 FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
 available features and adapts the interface to the connected board.
 
+## Firmware projects
+
+- **[FlightCode](https://github.com/tommyleo/FlightCode)** — firmware for
+  supported STM32 flight controllers, including analog and HD targets,
+  microSD or internal-flash Blackbox where available, OSD, receiver setup,
+  diagnostics, and STM32 DFU flashing.
+- **[FlightCodePI](https://github.com/tommyleo/FlightCodePI)** — firmware for
+  Raspberry Pi Pico 2 and Pico 2 W boards, with SBUS, DSHOT, configurable flight
+  control, protected diagnostics, onboard flight logs, and RP2350 UF2 flashing.
+
+Choose the firmware repository that matches the flight-controller processor;
+both projects use this Configurator and the same capability-driven interface.
+
 FlightCodePI exposes every configurator feature: PID settings, rates/expo,
 feedforward, TPA, gyroscope and D-term filters, alignment, motor protocol and
 idle, calibration, protected PID diagnostics, flight logs, and USB BOOTSEL

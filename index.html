@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
   <title>FlightCode Configurator</title>
-  <link rel="stylesheet" href="styles.css?v=20260830-1">
+  <link rel="stylesheet" href="styles.css?v=20260830-2">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
   <link rel="stylesheet" href="firmware-flasher.css?v=20260819-2">
@@ -75,6 +75,13 @@
             <button id="enterDfuButton" class="button secondary" disabled>Restart in bootloader mode</button>
           </div>
         </div>
+        <section class="project-links" aria-labelledby="projectLinksTitle">
+          <header><div><small>OPEN-SOURCE FIRMWARE</small><h2 id="projectLinksTitle">FlightCode projects</h2></div><p>Source code, board documentation, build instructions, releases, and issue tracking.</p></header>
+          <div class="project-link-grid">
+            <a class="project-link" href="https://github.com/tommyleo/FlightCode" target="_blank" rel="noopener noreferrer"><span>STM32 FLIGHT CONTROLLERS</span><strong>FlightCode</strong><p>Firmware for supported STM32F4 and STM32H7 boards, with board-specific OSD, receiver, Blackbox, diagnostics, and DFU features.</p><b>Open repository <i aria-hidden="true">↗</i></b></a>
+            <a class="project-link" href="https://github.com/tommyleo/FlightCodePI" target="_blank" rel="noopener noreferrer"><span>RASPBERRY PI PICO 2</span><strong>FlightCodePI</strong><p>Firmware for Pico 2 and Pico 2 W controllers, with SBUS, DSHOT, configurable PID control, protected diagnostics, flight logs, and UF2 flashing.</p><b>Open repository <i aria-hidden="true">↗</i></b></a>
+          </div>
+        </section>
       </section>
       <section id="receiverView" class="view">
         <header class="heading"><div><small id="receiverInputType">INPUT / SBUS</small><h1>Receiver channels</h1></div><b id="receiverState" class="badge">NO SIGNAL</b></header>
