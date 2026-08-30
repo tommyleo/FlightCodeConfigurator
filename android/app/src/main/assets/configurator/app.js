@@ -3,7 +3,7 @@ let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"AR
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
 vtxTables.HDZERO={R:[5658,5695,5732,5769,5806,5843,5880,5917],E:[5705,0,0,0,0,0,0,0],F:[5740,5760,0,5800,0,0,0,0],L:[5362,5399,5436,5473,5510,5547,5584,5621]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdDigital:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const osdElements=[
   {label:"Battery voltage",sample:"▤16.80V"},
   {label:"Cell voltage",sample:"▤4.20V"},
@@ -156,7 +156,7 @@ function updateOsdControls(){
   $("#osdPilotName").disabled=!usable;
   $("#applyOsdButton").disabled=!usable;
   $("#saveOsdButton").disabled=!usable;
-  $("#osdDetectionState").textContent=state.osdAvailable?"MAX7456 DETECTED":"NOT DETECTED";
+  $("#osdDetectionState").textContent=state.osdAvailable?(state.osdDigital?"MSP DISPLAYPORT READY":"MAX7456 DETECTED"):"NOT DETECTED";
 }
 function formatBytes(bytes){if(bytes<1024)return `${bytes} B`;if(bytes<1048576)return `${(bytes/1024).toFixed(1)} KB`;return `${(bytes/1048576).toFixed(1)} MB`}
 function formatCardCapacity(mebibytes){
@@ -240,10 +240,10 @@ function finishBlackboxDownload(){
 }
 function osdElementText(index){return index===4?(osdLayout.pilot||"PILOT"):osdElements[index].sample}
 function setOsdVideoMode(mode){
-  state.osdRows=mode==="NTSC"?13:16;
+  state.osdRows=mode==="NTSC"?13:16;const digital=mode==="HD";
   const preview=$("#osdPreview");preview.style.setProperty("--osd-rows",state.osdRows);preview.style.aspectRatio=`30 / ${state.osdRows}`;
-  $("#osdGridFormat").textContent=`${mode==="NTSC"?"NTSC":"PAL"} · 30 × ${state.osdRows} GRID`;
-  $("#osdGridHelp").textContent=`Drag an element to place it. Positions snap to the ${30} × ${state.osdRows} ${mode==="NTSC"?"NTSC":"PAL"} grid.`;
+  const format=digital?"HDZERO CENTERED":mode==="NTSC"?"NTSC":"PAL";$("#osdGridFormat").textContent=`${format} · 30 × ${state.osdRows} GRID`;
+  $("#osdGridHelp").textContent=`Drag an element to place it. Positions snap to the 30 × ${state.osdRows} ${format} grid.`;
   renderOsdLayout();
 }
 function renderOsdLayout(){
@@ -840,11 +840,12 @@ function line(value){
     $("#vbatMultiplierState").textContent=p[3]==="1"?"Saved to flash":"Applied · not saved";return;
   }
   if(p[1]==="OSD_STATUS"){
-    const wasAvailable=state.osdAvailable,available=p[2]==="1";state.osdAvailable=available;
+    const wasAvailable=state.osdAvailable,available=p[2]==="1";state.osdAvailable=available;state.osdDigital=p[5]==="HD";
     if(!state.osdDirty)$("#osdEnabled").checked=p[3]==="1";updateOsdControls();
     setOsdVideoMode(p[5]||"PAL");
-    $("#osdDetectionState").textContent=state.osdAvailable?`DETECTED · ${p[6]||"FONT ?"}`:`NOT DETECTED · OSDM 0x${p[7]||"??"}`;
-    $("#osdDetectionState").title=`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
+    $("#osdBackendTitle").textContent=state.osdDigital?"VIDEO / MSP DISPLAYPORT":"VIDEO / MAX7456";$("#osdConnectionTitle").textContent=state.osdDigital?"DIGITAL VIDEO LINK":"REMOVE ALL PROPELLERS";$("#osdConnectionHelp").textContent=state.osdDigital?"The selected UART sends MSP DisplayPort at 115200 baud. Use the VTX tab to select HDZero MSP and the UART wired to the digital VTX.":"For reliable detection, power the flight controller from the LiPo first, then connect USB. The MAX7456 may not be powered by USB alone.";
+    $("#osdDetectionState").textContent=state.osdDigital?(available?"MSP DISPLAYPORT READY":"MSP DISPLAYPORT OFF"):state.osdAvailable?`DETECTED · ${p[6]||"FONT ?"}`:`NOT DETECTED · OSDM 0x${p[7]||"??"}`;
+    $("#osdDetectionState").title=state.osdDigital?"HDZero MSP DisplayPort · 30 × 16 centered canvas":`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
   }
   if(p[1]==="OSD_LAYOUT"&&p.length>=12){

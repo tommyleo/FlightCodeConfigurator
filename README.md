@@ -80,6 +80,12 @@ samples, while motor output and timed system tasks follow the main scheduler.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
+On `FLYWOOF405NANO` and `HDZERO_HALO`, the Camera OSD tab controls the MSP
+DisplayPort overlay using an HDZero-compatible 30 × 16 canvas centered in the
+HD display. The VTX tab selects `HDZERO_MSP` and the connected UART; Flywoo HD
+defaults to UART6 and Halo defaults to UART5 on a fresh firmware configuration.
+Analog targets continue to use their MAX7456/AT7456E backend.
+
 On CLRACINGF4, the Blackbox page lists microSD flights retained across power
 cycles. On both Flywoo Nano targets it manages the internal 16 MiB flash and
 its latest retained flight. These targets download indexed flights as FlightCode JSON logs
@@ -102,7 +108,7 @@ or disabled after connection.
 | Guided IMU calibration | Yes | Yes | Yes | Yes | Yes |
 | Guided PID/mixer simulation | Yes | Yes | Yes | Yes | Yes |
 | Battery voltage telemetry | Yes | Yes | Yes | Yes | Yes |
-| Analog OSD layout editor | Drag-and-drop, 5 elements | Drag-and-drop, 5 elements | No (HD digital board) | Drag-and-drop, 5 elements | Firmware dependent |
+| OSD layout editor | Analog, drag-and-drop | Analog, drag-and-drop | MSP DisplayPort, 30 × 16 centered | Analog, drag-and-drop | Firmware dependent |
 | RAM flight-log download | Yes | Yes | Yes | Yes | Yes |
 | Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | 16 MiB internal flash, latest flight | No |
 | Blackbox write/session diagnostics | No | Storage status | Yes | Yes | No |

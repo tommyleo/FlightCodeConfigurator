@@ -229,10 +229,10 @@
         <p class="motor-hint">Return all sliders to zero before disabling the test or disconnecting the battery.</p>
       </section>
       <section id="osdView" class="view">
-        <header class="heading"><div><small>VIDEO / MAX7456</small><h1>Camera OSD</h1></div><b id="osdDetectionState" class="badge">NOT DETECTED</b></header>
+        <header class="heading"><div><small id="osdBackendTitle">VIDEO / MAX7456</small><h1>Camera OSD</h1></div><b id="osdDetectionState" class="badge">NOT DETECTED</b></header>
         <article class="osd-safety">
-          <strong>REMOVE ALL PROPELLERS</strong>
-          <p>For reliable detection, power the flight controller from the LiPo first, then connect USB. The MAX7456 may not be powered by USB alone.</p>
+          <strong id="osdConnectionTitle">REMOVE ALL PROPELLERS</strong>
+          <p id="osdConnectionHelp">For reliable detection, power the flight controller from the LiPo first, then connect USB. The MAX7456 may not be powered by USB alone.</p>
         </article>
         <article class="card osd-card">
           <header>OSD LAYOUT <small id="osdGridFormat">PAL · 30 × 16 GRID</small></header>
@@ -396,7 +396,7 @@
   <script src="serial-port-logic.js?v=20260809-1"></script>
   <script src="webusb-serial.js?v=20260817-2"></script>
   <script src="android-usb-serial.js?v=20260824-1"></script>
-  <script src="app.js?v=20260830-3"></script>
+  <script src="app.js?v=20260830-4"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>
