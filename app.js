@@ -53,9 +53,9 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,readyAt:0,samples:[],
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null,blackboxDiagnostics:null,metadata:null,metadataParts:{}};
 const blackbox={flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false};
 const tuningProfiles={
-  balanced:{label:"BALANCED",pids:[.1005,.2,.0010,.1005,.2,.0008,.155,.25,0],rates:[500,500,400],expo:.35,ff:[.022,.022,.013],tpa:[20,70],filters:[90,50]},
-  racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,350],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[90,50]},
-  freestyle:{label:"FREESTYLE",pids:[.1005,.2,.0011,.1005,.2,.0009,.155,.25,0],rates:[650,650,500],expo:.40,ff:[.020,.020,.012],tpa:[20,65],filters:[90,50]}
+  balanced:{label:"BALANCED",pids:[.1005,.2,.0010,.1005,.2,.0008,.155,.25,0],rates:[500,500,400],expo:.35,ff:[.022,.022,.013],tpa:[20,70],filters:[90,50,12.5]},
+  racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,350],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[90,50,10]},
+  freestyle:{label:"FREESTYLE",pids:[.1005,.2,.0011,.1005,.2,.0009,.155,.25,0],rates:[650,650,500],expo:.40,ff:[.020,.020,.012],tpa:[20,65],filters:[90,50,15]}
 };
 const $=s=>document.querySelector(s);
 
@@ -124,7 +124,7 @@ function renderVtxTable(){const hdzero=$("#vtxProtocol").value==="HDZERO_MSP",re
 function setVtxConfig(config,saved=false){vtxConfig={...vtxConfig,...config};$("#vtxProtocol").value=vtxConfig.protocol;$("#vtxSerialPort").value=vtxConfig.port;$("#vtxTable").value=vtxConfig.table;validateSerialAssignments();$("#vtxBand").value=vtxConfig.band;validateSerialAssignments();$("#vtxChannel").value=vtxConfig.channel;$("#vtxPower").value=vtxConfig.power;$("#vtxConfigState").textContent=saved?"Saved to flash":"Unsaved changes";renderVtxTable()}
 function vtxCommand(){return `SET_VTX_CONFIG ${$("#vtxProtocol").value} ${$("#vtxSerialPort").value} ${$("#vtxTable").value} ${$("#vtxBand").value} ${$("#vtxChannel").value} ${$("#vtxPower").value}`}
 document.querySelectorAll("[data-vtx-config]").forEach(el=>el.onchange=()=>{$("#vtxConfigState").textContent="Unsaved changes";if(el.id==="vtxTable")renderVtxTable();validateSerialAssignments()});$("#receiverSerialPort").addEventListener("change",validateSerialAssignments);renderVtxTable();
-function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}View`));document.querySelectorAll(".nav").forEach(v=>v.classList.toggle("active",v.dataset.view===name))}
+function view(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`${name}View`));document.querySelectorAll(".nav").forEach(v=>v.classList.toggle("active",v.dataset.view===name));window.scrollTo({top:0,left:0,behavior:"instant"})}
 document.querySelectorAll(".nav").forEach(v=>v.onclick=()=>view(v.dataset.view));
 function badge(el,text,type=""){el.textContent=text;el.className=`badge ${type}`}
 function resetSbusDiagnostics(){
@@ -194,7 +194,7 @@ function renderBlackboxFlights(){
     :`No indexed Blackbox flights are stored on the ${hasCapability("BLACKBOX_FLASH")?"internal flash":"microSD"}.`;
   $("#blackboxFlightList").innerHTML=blackbox.flights.map(flight=>`<div class="blackbox-flight">
     <div><small>FLIGHT</small><span>#${flight.id}</span></div>
-    <div><small>DURATION</small><span>${(flight.records/200).toFixed(1)} s</span></div>
+    <div><small>DURATION</small><span>${(flight.records/(flight.rate||200)).toFixed(1)} s</span></div>
     <div><small>SAMPLES</small><span>${flight.records.toLocaleString()}</span></div>
     <div><small>STOP REASON</small><span>${stopReasonName(flight.stopFlag)}</span></div>
     <button class="button secondary" data-blackbox-download="${flight.id}">Download</button>
@@ -221,14 +221,17 @@ function startBlackboxDownload(flightId){
 function finishBlackboxDownload(){
   const flight=blackbox.flight;
   const metadata=flight.metadata;
-  const file={format:"FlightCode-Flight-Log",version:7,source:"persistent Blackbox",flightId:flight.id,
-    created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||200,
+  const timestamped=blackbox.records.length&&Number.isFinite(blackbox.records[0].timestampUs);
+  if(timestamped){const origin=blackbox.records[0].timestampUs>>>0;blackbox.records.forEach(record=>{record.t=Number((((record.timestampUs>>>0)-origin>>>0)/1000000).toFixed(6))})}
+  const file={format:"FlightCode-Flight-Log",version:8,source:"persistent Blackbox",flightId:flight.id,
+    created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||flight.rate||200,
     alignment:metadata?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:metadata?.motorDirection||$("#motorDirection").value,
     rates:metadata?.rates||getRates(),feedforward:metadata?.feedforward||getFeedforward(),
     pids:metadata?.pids||getPids(),tpa:metadata?.tpa||getTpa(),
     filters:metadata?.filters||(hasCapability("FILTERS")?getFilters():undefined),
-    flightConfiguration:metadata||null,stopReason:stopReasonName(flight.stopFlag),samples:blackbox.records};
+    flightConfiguration:metadata||null,stopReason:stopReasonName(flight.stopFlag),
+    droppedRecords:blackbox.records.length?blackbox.records.at(-1).droppedRecords||0:0,samples:blackbox.records};
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`FlightCode-BLACKBOX-${flight.id}-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -804,15 +807,16 @@ function getTpa(){
   return {attenuation,breakpoint};
 }
 function tpaCommand(){const t=getTpa();return `SET_TPA ${t.attenuation/100} ${t.breakpoint}`}
-function setFilters(values){$("#gyroLpfHz").value=Number(values[0]).toFixed(0);$("#dtermLpfHz").value=Number(values[1]).toFixed(0)}
+function setFilters(values){$("#gyroLpfHz").value=Number(values[0]).toFixed(0);$("#dtermLpfHz").value=Number(values[1]).toFixed(0);$("#dynamicDBoost").value=Number(values[2]??12.5).toFixed(1)}
 function getFilters(){
-  const gyro=Number($("#gyroLpfHz").value),dterm=Number($("#dtermLpfHz").value);
+  const gyro=Number($("#gyroLpfHz").value),dterm=Number($("#dtermLpfHz").value),dynamicD=Number($("#dynamicDBoost").value);
   if(!Number.isFinite(gyro)||gyro<50||gyro>250)throw new Error("Gyro low-pass must be between 50 and 250 Hz");
   if(!Number.isFinite(dterm)||dterm<20||dterm>200)throw new Error("D-term low-pass must be between 20 and 200 Hz");
   if(dterm>gyro)throw new Error("D-term low-pass cannot exceed the gyro low-pass");
-  return {gyro,dterm};
+  if(!Number.isFinite(dynamicD)||dynamicD<0||dynamicD>50)throw new Error("Dynamic D boost must be between 0% and 50%");
+  return {gyro,dterm,dynamicD};
 }
-function filtersCommand(){const f=getFilters();return `SET_FILTERS ${f.gyro} ${f.dterm}`}
+function filtersCommand(){const f=getFilters();return `SET_FILTERS ${f.gyro} ${f.dterm} ${f.dynamicD}`}
 function setActiveTuningProfile(name){
   document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.classList.toggle("active",button.dataset.tuningProfile===name));
   $("#activeTuningProfile").textContent=name&&tuningProfiles[name]?tuningProfiles[name].label:"CUSTOM";
@@ -879,14 +883,14 @@ function line(value){
     blackbox.expectedFlights=Number(p[2])||0;blackbox.flights=[];return
   }
   if(p[1]==="BLACKBOX_FLIGHT"&&p.length>=6){
-    blackbox.flights.push({id:Number(p[2]),records:Number(p[3]),blocks:Number(p[4]),stopFlag:Number(p[5])});return
+    blackbox.flights.push({id:Number(p[2]),records:Number(p[3]),blocks:Number(p[4]),stopFlag:Number(p[5]),rate:Number(p[6])||200});return
   }
   if(p[1]==="BLACKBOX_CATALOG_END"){
     renderBlackboxFlights();return
   }
   if(p[1]==="BLACKBOX_LOG"&&blackbox.downloading&&p.length>=33){
     const flightId=Number(p[2]),index=Number(p[3]),values=p.slice(4).map(Number);
-    const record=decodeLogRecord(values,index);if(record&&blackbox.flight?.id===flightId)blackbox.records.push(record);return
+    const record=decodeLogRecord(values,index,blackbox.flight?.metadata?.logRateHz||blackbox.flight?.rate||200);if(record&&blackbox.flight?.id===flightId)blackbox.records.push(record);return
   }
   if(p[1]==="BLACKBOX_METADATA_CORE"&&blackbox.downloading){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
@@ -901,15 +905,15 @@ function line(value){
   if(p[1]==="BLACKBOX_METADATA_END"&&blackbox.downloading){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
     const c=f.metadataParts.core,t=f.metadataParts.tuning,ps=f.metadataParts.pids;
-    if(c&&t&&ps)f.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10]},alignment:t.slice(11,14),motorIdlePercent:t[14]};
-    send(`GET_BLACKBOX_CHUNK ${f.id} 0 16`,false);return
+    if(c&&t&&ps)f.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10],dynamicD:t[15]??0},alignment:t.slice(11,14),motorIdlePercent:t[14]};
+    send(`GET_BLACKBOX_CHUNK ${f.id} 0 12`,false);return
   }
-  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){send(`GET_BLACKBOX_CHUNK ${blackbox.flight.id} 0 16`,false);return}
+  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){send(`GET_BLACKBOX_CHUNK ${blackbox.flight.id} 0 12`,false);return}
   if(p[1]==="BLACKBOX_CHUNK_END"&&blackbox.downloading){
     const flightId=Number(p[2]),next=Number(p[3]),total=blackbox.flight.records;
     if(blackbox.flight.id!==flightId)return;
     $("#blackboxDownloadProgress").style.width=`${100*Math.min(next,total)/total}%`;
-    if(next<total)send(`GET_BLACKBOX_CHUNK ${flightId} ${next} 16`,false);else finishBlackboxDownload();return
+    if(next<total)send(`GET_BLACKBOX_CHUNK ${flightId} ${next} 12`,false);else finishBlackboxDownload();return
   }
   if(p[1]==="SBUS_DIAGNOSTICS"&&p.length>=9){
     const valid=p[2]==="1",age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
@@ -965,7 +969,7 @@ function line(value){
   if(p[1]==="FLIGHT_LOG_METADATA_TUNING"&&flightLog.downloading){flightLog.metadataParts.tuning=p.slice(2).map(Number);return}
   if(p[1]==="FLIGHT_LOG_METADATA_END"&&flightLog.downloading){
     const c=flightLog.metadataParts.core,t=flightLog.metadataParts.tuning,ps=flightLog.metadataParts.pids;
-    if(c&&t&&ps)flightLog.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10]},alignment:t.slice(11,14),motorIdlePercent:t[14]};
+    if(c&&t&&ps)flightLog.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10],dynamicD:t[15]??0},alignment:t.slice(11,14),motorIdlePercent:t[14]};
     send("GET_FLIGHT_LOG_CHUNK 0 8",false);return
   }
   if(p[1]==="FLIGHT_LOG_METADATA_UNAVAILABLE"&&flightLog.downloading){send("GET_FLIGHT_LOG_CHUNK 0 8",false);return}
@@ -1009,7 +1013,7 @@ function line(value){
   if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
-  if(p[1]==="FILTERS"&&p.length>=5){setFilters(p.slice(2,4));saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
+  if(p[1]==="FILTERS"&&p.length>=6){setFilters(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="VTX_CONFIG"&&p.length>=9){setVtxConfig({protocol:p[2],port:p[3],table:p[4],band:p[5],channel:Number(p[6]),power:Number(p[7])},p[8]==="1");return}
   if(p[1]==="VTX_CONFIG"&&p.length>=6){setVtxConfig({protocol:p[2],port:p[3],table:p[4]},p[5]==="1");return}
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=12){setReceiverConfig({protocol:p[2],port:p[3],order:p[4],modes:[{fn:"ARM",channel:Number(p[5]),min:Number(p[6]),max:Number(p[7])},{fn:"BEEP",channel:Number(p[8]),min:Number(p[9]),max:Number(p[10])}]},p[11]==="1");return}

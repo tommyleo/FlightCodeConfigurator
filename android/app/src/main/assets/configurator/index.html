@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
   <title>FlightCode Configurator</title>
-  <link rel="stylesheet" href="styles.css?v=20260821-3">
+  <link rel="stylesheet" href="styles.css?v=20260830-1">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
   <link rel="stylesheet" href="firmware-flasher.css?v=20260819-2">
@@ -150,10 +150,11 @@
         </article>
         <article class="rates-card">
           <header><div><small>NOISE CONTROL</small><h2>Gyroscope and D-term filters</h2></div>
-            <p>Lower frequencies reduce vibration reaching the controller. D-term must not exceed the gyro cutoff.</p></header>
+            <p>Lower frequencies reduce vibration reaching the controller. Dynamic D adds only the selected maximum boost during fast rotations or propwash.</p></header>
           <div class="rates-fields filter-fields">
             <label>Gyro low-pass <span>Hz</span><input id="gyroLpfHz" data-filter type="number" min="50" max="250" step="5" value="100" disabled></label>
             <label>D-term low-pass <span>Hz</span><input id="dtermLpfHz" data-filter type="number" min="20" max="200" step="5" value="60" disabled></label>
+            <label>Dynamic D boost <span>% max · 0 = disabled</span><input id="dynamicDBoost" data-filter type="number" min="0" max="50" step="0.5" value="12.5" disabled></label>
           </div>
         </article>
         <div class="actions"><button id="resetButton" class="button ghost" disabled>Restore defaults</button><div>
@@ -170,7 +171,7 @@
           <div class="protocol-control">
             <select id="motorProtocol" disabled>
               <option value="DSHOT300">DSHOT300</option>
-              <option value="DSHOT600">DSHOT600</option>
+              <option value="DSHOT600" selected>DSHOT600</option>
               <option value="DSHOT1200">DSHOT1200</option>
             </select>
             <button id="applyProtocolButton" class="button secondary protocol-action" disabled>Apply<br>protocol</button>
@@ -384,11 +385,11 @@
   <script src="quad-renderer.js?v=20260805-2"></script>
   <script src="diagnostic-logic.js?v=20260805-2"></script>
   <script src="attitude-logic.js?v=20260805-2"></script>
-  <script src="blackbox-logic.js?v=20260805-3"></script>
+  <script src="blackbox-logic.js?v=20260830-1"></script>
   <script src="serial-port-logic.js?v=20260809-1"></script>
   <script src="webusb-serial.js?v=20260817-2"></script>
   <script src="android-usb-serial.js?v=20260824-1"></script>
-  <script src="app.js?v=20260829-1"></script>
+  <script src="app.js?v=20260830-3"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>

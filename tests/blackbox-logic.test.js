@@ -32,4 +32,15 @@ assert.deepEqual(clippedRecord.pid,[35,-35,25]);
 
 assert.equal(blackbox.decodeRecord(encoded.slice(0,28),400,200),null);
 
+const extended=[...encoded,1234567,110,-220,330,125,-250,375,100,-200,300,7,20,-40,50];
+const extendedRecord=blackbox.decodeRecord(extended,1,1000);
+assert.equal(extendedRecord.t,0.001);
+assert.equal(extendedRecord.timestampUs,1234567);
+assert.deepEqual(extendedRecord.gyroRaw,[11,-22,33]);
+assert.deepEqual(extendedRecord.dTermUnfiltered,[1.25,-2.5,3.75]);
+assert.deepEqual(extendedRecord.dTermFiltered,[1,-2,3]);
+assert.deepEqual(extendedRecord.dTerm,[1,-2,3]);
+assert.equal(extendedRecord.droppedRecords,7);
+assert.deepEqual(extendedRecord.pid,[10,-20,25]);
+
 console.log("Configurator Blackbox logic tests passed");
