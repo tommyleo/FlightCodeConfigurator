@@ -1,5 +1,7 @@
 # FlightCode Configurator
 
+Current release: **1.0.0**.
+
 Shared Web Serial configurator for FlightCode firmware on STM32F4 and
 FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
 available features and adapts the interface to the connected board.
