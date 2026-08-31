@@ -389,7 +389,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";$("#protocolText").textContent="USB serial";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -928,7 +928,7 @@ function line(value){
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
     if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
     updateMotorProtocolOptions();applyCapabilities();window.firmwareFlasher?.setDetectedBoard?.(state.board);
-    $("#deviceName").textContent=`FlightCode · ${state.board}`;$("#protocolText").textContent=`Protocol v${state.protocol}`;view("setup");toast(`${state.board} detected`);
+    $("#deviceName").textContent=`FlightCode · ${state.board}`;view("setup");toast(`${state.board} detected`);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
     if(hasCapability("BLACKBOX_SD"))send("GET_BLACKBOX_STATUS",false);if(hasCapability("BLACKBOX_CATALOG"))requestBlackboxCatalog()
     return;
