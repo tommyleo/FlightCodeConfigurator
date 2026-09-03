@@ -1170,7 +1170,8 @@ $("#saveBlackboxButton").onclick=async()=>{await send(blackboxCommand());await s
 $("#clearBlackboxButton").onclick=async()=>{
   if(state.armed||blackbox.downloading||!blackbox.flights.length)return;
   if(!confirm("Erase the Blackbox flight catalog? Stored flights will no longer be downloadable."))return;
-  await send("CLEAR_BLACKBOX");blackbox.flights=[];renderBlackboxFlights();$("#blackboxDownloadState").textContent="Flight catalog erased";
+  await send("CLEAR_BLACKBOX");blackbox.flights=[];blackbox.totalBytes=0;$("#blackboxStored").textContent=formatBytes(0);renderBlackboxFlights();$("#blackboxDownloadState").textContent="Flight catalog erased";
+  setTimeout(()=>{if(state.connected)send("GET_BLACKBOX_STATUS",false)},250);
 };
 buttons.saveReceiver.onclick=async()=>{try{const config=getReceiverConfig();await send(receiverCommand());await send("SAVE_SETTINGS");state.activeReceiverProtocol=config.protocol;state.activeReceiverPort=config.port;updateDfuButton()}catch(error){toast(error.message)}};
 buttons.saveVtx.onclick=async()=>{try{await send(vtxCommand());await send("SAVE_SETTINGS");$("#vtxConfigState").textContent="Saved to flash · reboot required"}catch(error){toast(error.message)}};
