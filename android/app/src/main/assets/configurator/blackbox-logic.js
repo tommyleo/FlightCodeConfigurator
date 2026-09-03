@@ -30,5 +30,42 @@ const FlightCodeBlackboxLogic=(()=>{
       dTermFiltered:dTerm,droppedRecords:extended?values[39]:0};
   }
 
-  return {stopReasonName,decodeRecord};
+  function decodeBinaryRecord(bytes,index,rate=200,batteryCells=0){
+    if(!bytes||bytes.byteLength<48)return null;
+    const view=new DataView(bytes.buffer,bytes.byteOffset,48);
+    const i16=offset=>view.getInt16(offset,true),u16=offset=>view.getUint16(offset,true);
+    const timestampUs=view.getUint32(0,true),flags=view.getUint8(39);
+    const gyroRaw=[i16(4),i16(6),i16(8)].map(v=>v/10);
+    const gyro=[i16(10),i16(12),i16(14)].map(v=>v/10);
+    const setpoint=[i16(16),i16(18),i16(20)].map(v=>v/10);
+    const dTermUnfiltered=[i16(22),i16(24),i16(26)].map(v=>v/100);
+    const dTerm=[i16(28),i16(30),i16(32)].map(v=>v/100);
+    const batteryCentivolts=u16(43);
+    return {t:Number((index/rate).toFixed(5)),gyro,setpoint,
+      pid:[view.getInt8(40),view.getInt8(41),view.getInt8(42)].map(v=>v/2),
+      motors:[34,35,36,37].map(offset=>Number((view.getUint8(offset)*100/255).toFixed(2))),
+      throttle:view.getUint8(38)/2,mixerSaturated:(flags&1)!==0,stopReason:stopReasonName(flags),
+      mainLoopUs:0,mainLoopHz:0,gyroLoopUs:0,gyroLoopHz:0,
+      batteryVoltage:batteryCentivolts/100,
+      cellVoltage:batteryCells?Math.floor(batteryCentivolts/batteryCells)/100:0,batteryCells,
+      pTerm:[0,0,0],iTerm:[0,0,0],dTerm,ffTerm:[0,0,0],timestampUs,gyroRaw,
+      dTermUnfiltered,dTermFiltered:dTerm,droppedRecords:u16(45)};
+  }
+
+  function addMissingSector(ranges,start,count,sector){
+    if(!Array.isArray(ranges)||!Number.isFinite(start)||!Number.isFinite(count)||count<=0)return;
+    const last=ranges.at(-1),lastSector=last?.lastSector??last?.sector;
+    if(last&&last.start+last.count===start&&lastSector+1===sector){
+      last.count+=count;last.lastSector=sector;return;
+    }
+    ranges.push({start,count,sector,lastSector:sector});
+  }
+
+  function missingSectorCount(ranges){
+    return (ranges||[]).reduce((total,range)=>total+
+      (Number.isFinite(range.lastSector)&&Number.isFinite(range.sector)
+        ?Math.max(1,range.lastSector-range.sector+1):Math.ceil(range.count/10)),0);
+  }
+
+  return {stopReasonName,decodeRecord,decodeBinaryRecord,addMissingSector,missingSectorCount};
 })();

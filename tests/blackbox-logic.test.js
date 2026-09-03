@@ -43,4 +43,35 @@ assert.deepEqual(extendedRecord.dTerm,[1,-2,3]);
 assert.equal(extendedRecord.droppedRecords,7);
 assert.deepEqual(extendedRecord.pid,[10,-20,25]);
 
+const binary=new Uint8Array(48),binaryView=new DataView(binary.buffer);
+binaryView.setUint32(0,1234567,true);
+[110,-220,330,100,-200,300,40,50,60,125,-250,375,100,-200,300].forEach((value,i)=>binaryView.setInt16(4+i*2,value,true));
+[0,128,255,64,70,3].forEach((value,i)=>binaryView.setUint8(34+i,value));
+[20,-40,50].forEach((value,i)=>binaryView.setInt8(40+i,value));
+binaryView.setUint16(43,1480,true);binaryView.setUint16(45,7,true);binaryView.setUint8(47,2);
+const binaryRecord=blackbox.decodeBinaryRecord(binary,1,1000,4);
+assert.equal(binaryRecord.t,0.001);
+assert.equal(binaryRecord.timestampUs,1234567);
+assert.deepEqual(Array.from(binaryRecord.gyroRaw),[11,-22,33]);
+assert.deepEqual(Array.from(binaryRecord.gyro),[10,-20,30]);
+assert.deepEqual(Array.from(binaryRecord.setpoint),[4,5,6]);
+assert.deepEqual(Array.from(binaryRecord.dTermUnfiltered),[1.25,-2.5,3.75]);
+assert.deepEqual(Array.from(binaryRecord.dTerm),[1,-2,3]);
+assert.deepEqual(Array.from(binaryRecord.pid),[10,-20,25]);
+assert.equal(binaryRecord.batteryVoltage,14.8);
+assert.equal(binaryRecord.cellVoltage,3.7);
+assert.equal(binaryRecord.droppedRecords,7);
+assert.equal(blackbox.decodeBinaryRecord(new Uint8Array(47),0),null);
+
+const missing=[];
+blackbox.addMissingSector(missing,17840,10,44631);
+blackbox.addMissingSector(missing,17850,10,44632);
+blackbox.addMissingSector(missing,18000,10,44647);
+assert.equal(missing.length,2);
+assert.equal(missing[0].start,17840);
+assert.equal(missing[0].count,20);
+assert.equal(missing[0].sector,44631);
+assert.equal(missing[0].lastSector,44632);
+assert.equal(blackbox.missingSectorCount(missing),3);
+
 console.log("Configurator Blackbox logic tests passed");

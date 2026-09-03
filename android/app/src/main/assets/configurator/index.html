@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
-  <title>FlightCode Configurator 1.0.0</title>
-  <link rel="stylesheet" href="styles.css?v=20260830-2">
+  <title>FlightCode Configurator 1.1.0</title>
+  <link rel="stylesheet" href="styles.css?v=20260903-1">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
   <link rel="stylesheet" href="firmware-flasher.css?v=20260819-2">
@@ -14,7 +14,7 @@
   <header class="topbar">
     <div class="brand">
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
-      <div><b>FlightCode</b><small>CONFIGURATOR · v1.0.0</small></div>
+      <div><b>FlightCode</b><small>CONFIGURATOR · v1.1.0</small></div>
     </div>
     <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
@@ -31,9 +31,13 @@
       <button class="nav" data-view="diagnostic"><span>07</span>IMU Diagnostics</button>
       <button class="nav" data-view="blackbox"><span>08</span>Blackbox</button>
       <button class="nav" data-view="firmware"><span>09</span>Firmware</button>
-      <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b></div></div>
+      <div class="device"><i id="deviceDot"></i><div><b id="deviceName">No device</b><small id="firmwareVersion"></small></div></div>
     </aside>
     <main>
+      <div id="firmwareCompatibilityAlert" class="firmware-compatibility-alert" hidden role="alert">
+        <strong>FIRMWARE UPDATE STRONGLY RECOMMENDED</strong>
+        <span id="firmwareCompatibilityText"></span>
+      </div>
       <section id="setupView" class="view active">
         <header class="heading"><div><small>SETUP / ORIENTATION</small><h1>Live attitude</h1></div><b id="flightState" class="badge">OFFLINE</b></header>
         <div class="setup-grid">
@@ -392,11 +396,11 @@
   <script src="quad-renderer.js?v=20260805-2"></script>
   <script src="diagnostic-logic.js?v=20260805-2"></script>
   <script src="attitude-logic.js?v=20260805-2"></script>
-  <script src="blackbox-logic.js?v=20260830-1"></script>
+  <script src="blackbox-logic.js?v=20260903-1"></script>
   <script src="serial-port-logic.js?v=20260809-1"></script>
   <script src="webusb-serial.js?v=20260817-2"></script>
   <script src="android-usb-serial.js?v=20260824-1"></script>
-  <script src="app.js?v=20260903-1"></script>
+<script src="app.js?v=20260903-9"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>

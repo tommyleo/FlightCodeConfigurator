@@ -1,9 +1,10 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
+const CONFIGURATOR_VERSION="1.1.0",MINIMUM_FIRMWARE_VERSION="1.1.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
 vtxTables.HDZERO={R:[5658,5695,5732,5769,5806,5843,5880,5917],E:[5705,0,0,0,0,0,0,0],F:[5740,5760,0,5800,0,0,0,0],L:[5362,5399,5436,5473,5510,5547,5584,5621]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdDigital:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",rxBytes:new Uint8Array(0),binaryTransfer:null,heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",firmwareVersion:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdDigital:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const osdElements=[
   {label:"Battery voltage",sample:"▤16.80V"},
   {label:"Cell voltage",sample:"▤4.20V"},
@@ -51,7 +52,7 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,readyAt:0,samples:[],
   {key:"commandYaw",ms:4000,text:"Move yaw right, then center the stick"}
 ]};
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null,blackboxDiagnostics:null,metadata:null,metadataParts:{}};
-const blackbox={flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false};
+const blackbox={flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false,downloadStartedAt:0,lastProgressUiAt:0,requestedOffset:0,skippedRanges:[]};
 const tuningProfiles={
   balanced:{label:"BALANCED",pids:[.1005,.2,.0010,.1005,.2,.0008,.155,.25,0],rates:[500,500,400],expo:.35,ff:[.022,.022,.013],tpa:[20,70],filters:[90,50,12.5]},
   racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,350],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[90,50,10]},
@@ -187,6 +188,28 @@ function decodeLogRecord(values,index,rate=200){
   return FlightCodeBlackboxLogic.decodeRecord(values,index,rate);
 }
 
+function requestBlackboxChunk(flightId,offset){
+  const binary=hasCapability("BLACKBOX_BINARY");
+  blackbox.requestedOffset=offset;
+  send(`${binary?"GET_BLACKBOX_BINARY":"GET_BLACKBOX_CHUNK"} ${flightId} ${offset} ${binary?40:12}`,false);
+}
+
+function failBlackboxDownload(message){
+  blackbox.downloading=false;blackbox.flight=null;state.binaryTransfer=null;
+  $("#blackboxDownloadState").textContent=message;updateBlackboxControls();toast("Blackbox download stopped");
+}
+
+function receiveBlackboxBinary(transfer,bytes){
+  const flight=blackbox.flight;
+  if(!blackbox.downloading||!flight||flight.id!==transfer.flightId)return;
+  const rate=flight.metadata?.logRateHz||flight.rate||200;
+  const cells=flight.metadata?.batteryCells||0;
+  for(let i=0;i<transfer.count;i++){
+    const record=FlightCodeBlackboxLogic.decodeBinaryRecord(bytes.subarray(i*transfer.recordSize,(i+1)*transfer.recordSize),transfer.offset+i,rate,cells);
+    if(record)blackbox.records.push(record);
+  }
+}
+
 function renderBlackboxFlights(){
   $("#blackboxFlightCount").textContent=`${blackbox.flights.length} ${blackbox.flights.length===1?"FLIGHT":"FLIGHTS"}`;
   $("#blackboxCatalogMessage").textContent=blackbox.flights.length
@@ -211,16 +234,18 @@ function requestBlackboxCatalog(){
 function startBlackboxDownload(flightId){
   const flight=blackbox.flights.find(item=>item.id===flightId);
   if(!flight||blackbox.downloading||state.armed)return;
-  Object.assign(blackbox,{downloading:true,flight,records:[]});
+  Object.assign(blackbox,{downloading:true,flight,records:[],downloadStartedAt:performance.now(),lastProgressUiAt:0,requestedOffset:0,skippedRanges:[]});
   flight.metadata=null;flight.metadataParts={};
   $("#blackboxDownloadProgress").style.width="0%";
   $("#blackboxDownloadState").textContent=`Downloading flight #${flight.id}…`;
   updateBlackboxControls();send(`GET_BLACKBOX_METADATA ${flight.id}`,false);
 }
 
-function finishBlackboxDownload(){
+function finishBlackboxDownload(incomplete=null){
   const flight=blackbox.flight;
   const metadata=flight.metadata;
+  const skippedSectors=FlightCodeBlackboxLogic.missingSectorCount(blackbox.skippedRanges);
+  const partial=Boolean(incomplete)||skippedSectors>0;
   const timestamped=blackbox.records.length&&Number.isFinite(blackbox.records[0].timestampUs);
   if(timestamped){const origin=blackbox.records[0].timestampUs>>>0;blackbox.records.forEach(record=>{record.t=Number((((record.timestampUs>>>0)-origin>>>0)/1000000).toFixed(6))})}
   const file={format:"FlightCode-Flight-Log",version:8,source:"persistent Blackbox",flightId:flight.id,
@@ -231,12 +256,22 @@ function finishBlackboxDownload(){
     pids:metadata?.pids||getPids(),tpa:metadata?.tpa||getTpa(),
     filters:metadata?.filters||(hasCapability("FILTERS")?getFilters():undefined),
     flightConfiguration:metadata||null,stopReason:stopReasonName(flight.stopFlag),
-    droppedRecords:blackbox.records.length?blackbox.records.at(-1).droppedRecords||0:0,samples:blackbox.records};
+    incomplete:partial,downloadedSamples:blackbox.records.length,
+    expectedSamples:flight.records,
+    downloadInterruption:incomplete,
+    skippedSectors,
+    droppedRecords:blackbox.records.length?blackbox.records.at(-1).droppedRecords||0:0,
+    missingSampleRanges:blackbox.skippedRanges,samples:blackbox.records};
   const blob=new Blob([JSON.stringify(file)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=url;a.download=`FlightCode-BLACKBOX-${flight.id}-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
+  a.href=url;a.download=`FlightCode-BLACKBOX-${flight.id}${partial?"-PARTIAL":""}-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
-  blackbox.downloading=false;blackbox.flight=null;$("#blackboxDownloadProgress").style.width="100%";
-  $("#blackboxDownloadState").textContent="Download completed";updateBlackboxControls();toast("Blackbox flight downloaded");
+  const skipped=skippedSectors;
+  blackbox.downloading=false;blackbox.flight=null;
+  if(!incomplete)$("#blackboxDownloadProgress").style.width="100%";
+  $("#blackboxDownloadState").textContent=incomplete
+    ?`Partial file saved · ${blackbox.records.length.toLocaleString()} valid samples recovered · ${incomplete.message}`
+    :skipped?`Download completed · ${skipped} unreadable SD ${skipped===1?"sector":"sectors"} skipped and documented in the JSON`:"Download completed";
+  updateBlackboxControls();toast(incomplete?"Partial Blackbox file saved":skipped?"Blackbox downloaded with missing samples":"Blackbox flight downloaded");
 }
 function osdElementText(index){return index===4?(osdLayout.pilot||"PILOT"):osdElements[index].sample}
 function setOsdVideoMode(mode){
@@ -245,6 +280,15 @@ function setOsdVideoMode(mode){
   const format=digital?"HDZERO CENTERED":mode==="NTSC"?"NTSC":"PAL";$("#osdGridFormat").textContent=`${format} · 30 × ${state.osdRows} GRID`;
   $("#osdGridHelp").textContent=`Drag an element to place it. Positions snap to the 30 × ${state.osdRows} ${format} grid.`;
   renderOsdLayout();
+}
+function updateBlackboxDownloadProgress(flightId,next,total){
+  const now=performance.now();
+  if(next<total&&now-blackbox.lastProgressUiAt<100)return;
+  blackbox.lastProgressUiAt=now;
+  const progress=Math.min(next,total)/Math.max(total,1),elapsed=Math.max((now-blackbox.downloadStartedAt)/1000,.001);
+  const recordsPerSecond=next/elapsed,bytesPerSecond=blackbox.records.length*48/elapsed,remaining=recordsPerSecond>0?(total-next)/recordsPerSecond:0;
+  $("#blackboxDownloadProgress").style.width=`${progress*100}%`;
+  $("#blackboxDownloadState").textContent=`Downloading flight #${flightId} · ${(progress*100).toFixed(1)}% · ${formatBytes(bytesPerSecond)}/s${remaining>0?` · ${Math.ceil(remaining)} s remaining`:""}`;
 }
 function renderOsdLayout(){
   const container=$("#osdPreviewItems");container.replaceChildren();
@@ -353,6 +397,20 @@ function sbusBlocksDfu(){return state.signal&&state.activeReceiverProtocol==="SB
 function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;button.title=sbusBlocksDfu()?"Turn off the transmitter before entering DFU":"";window.firmwareFlasher?.updateReady?.()}
 function updateMainLoopButton(){buttons.applyMainLoop.disabled=!state.connected||!hasCapability("MAIN_LOOP")||!hasCapability("REBOOT")||state.armed||state.motorTest}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("visible");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("visible"),2400)}
+function compareVersions(left,right){
+  const a=String(left).split(".").map(Number),b=String(right).split(".").map(Number);
+  for(let i=0;i<3;i++){const delta=(a[i]||0)-(b[i]||0);if(delta)return delta}
+  return 0;
+}
+function updateFirmwareCompatibility(){
+  const version=state.firmwareVersion,alert=$("#firmwareCompatibilityAlert"),versionLabel=$("#firmwareVersion");
+  versionLabel.textContent=state.connected?(version?`FIRMWARE · v${version}`:"FIRMWARE · VERSION UNKNOWN"):"";
+  const outdated=state.connected&&Boolean(state.board)&&(!version||compareVersions(version,MINIMUM_FIRMWARE_VERSION)<0);
+  alert.hidden=!outdated;
+  if(outdated)$("#firmwareCompatibilityText").textContent=version
+    ?`Firmware ${version} is older than the version recommended by Configurator ${CONFIGURATOR_VERSION}. To ensure all features work correctly, updating the firmware to version ${MINIMUM_FIRMWARE_VERSION} or later is strongly recommended.`
+    :`This firmware does not report its version and predates Configurator ${CONFIGURATOR_VERSION}. To ensure all features work correctly, updating the firmware to version ${MINIMUM_FIRMWARE_VERSION} or later is strongly recommended.`;
+}
 function updateConnectionText(){
   $("#connectionText").textContent=!state.connected?"Board not connected":
     state.board?`FlightCode connected · ${state.board}`:"FlightCode connected";
@@ -395,9 +453,10 @@ function connected(value){
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
   if(!value&&pidDiagnostic.running)cancelPidDiagnostic("Check interrupted: board disconnected.");
   applyCapabilities();
+  updateFirmwareCompatibility();
 }
 function log(line,direction="RX"){
-  if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG BATTERY_VOLTAGE")||line.startsWith("@CFG SBUS_DIAGNOSTICS")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line.startsWith("@CFG BLACKBOX_LOG ")||line.startsWith("@CFG BLACKBOX_CHUNK_END")||line==="PING")return;
+  if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG BATTERY_VOLTAGE")||line.startsWith("@CFG SBUS_DIAGNOSTICS")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line.startsWith("@CFG BLACKBOX_LOG ")||line.startsWith("@CFG BLACKBOX_BINARY ")||line.startsWith("@CFG BLACKBOX_CHUNK_END")||line==="PING")return;
   const out=$("#consoleOutput");if(!state.count)out.textContent="";out.textContent+=`${new Date().toLocaleTimeString()}  ${direction}  ${line}\n`;out.scrollTop=out.scrollHeight;
   $("#messageCount").textContent=`${++state.count} messages`;
 }
@@ -833,6 +892,7 @@ function setAlignment(values){$("#boardRoll").value=Number(values[0]).toFixed(1)
 function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{const value=Number($(`#${id}`).value);if(!Number.isFinite(value)||value < -180||value > 180)throw new Error("Angles must be between -180° and +180°");return value})}
 function line(value){
   log(value);if(!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
+  if(blackbox.downloading&&["TELEMETRY","BATTERY_VOLTAGE","SBUS_DIAGNOSTICS"].includes(p[1]))return;
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}
   if(p[1]==="VBAT_MULTIPLIER"){
@@ -907,14 +967,20 @@ function line(value){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
     const c=f.metadataParts.core,t=f.metadataParts.tuning,ps=f.metadataParts.pids;
     if(c&&t&&ps)f.metadata={...c,pids:ps,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},filters:{gyro:t[9],dterm:t[10],dynamicD:t[15]??0},alignment:t.slice(11,14),motorIdlePercent:t[14]};
-    send(`GET_BLACKBOX_CHUNK ${f.id} 0 12`,false);return
+    requestBlackboxChunk(f.id,0);return
   }
-  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){send(`GET_BLACKBOX_CHUNK ${blackbox.flight.id} 0 12`,false);return}
+  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){requestBlackboxChunk(blackbox.flight.id,0);return}
+  if(p[1]==="BLACKBOX_BINARY"&&blackbox.downloading&&p.length>=6){
+    const flightId=Number(p[2]),offset=Number(p[3]),count=Number(p[4]),recordSize=Number(p[5]);
+    if(blackbox.flight?.id===flightId&&count>=0&&count<=40&&recordSize===48)state.binaryTransfer={flightId,offset,count,recordSize,bytes:count*recordSize};
+    return
+  }
   if(p[1]==="BLACKBOX_CHUNK_END"&&blackbox.downloading){
     const flightId=Number(p[2]),next=Number(p[3]),total=blackbox.flight.records;
     if(blackbox.flight.id!==flightId)return;
-    $("#blackboxDownloadProgress").style.width=`${100*Math.min(next,total)/total}%`;
-    if(next<total)send(`GET_BLACKBOX_CHUNK ${flightId} ${next} 12`,false);else finishBlackboxDownload();return
+    if(next<=blackbox.requestedOffset){failBlackboxDownload(`Download stopped at sample ${next.toLocaleString()}: the board could not read the next Blackbox sector.`);return}
+    updateBlackboxDownloadProgress(flightId,next,total);
+    if(next<total)requestBlackboxChunk(flightId,next);else finishBlackboxDownload();return
   }
   if(p[1]==="SBUS_DIAGNOSTICS"&&p.length>=9){
     const valid=p[2]==="1",age=Number(p[3]),frames=Number(p[4]),errors=Number(p[5]),recoveries=Number(p[6]),overruns=Number(p[7]),invalid=Number(p[8]);
@@ -924,7 +990,7 @@ function line(value){
   if(p[1]==="HELLO"){
     clearInterval(state.helloTimer);state.helloTimer=null;
     if(!["FlightCode","FlightCodePI"].includes(p[2])){toast(`Unrecognized device: ${p[2]||"unknown"}`);return}
-    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.capabilities=new Set();setReceiverProtocols(["SBUS"],false);updateConnectionText();
+    state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.firmwareVersion=p[5]||"";state.capabilities=new Set();setReceiverProtocols(["SBUS"],false);updateConnectionText();updateFirmwareCompatibility();
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
     if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
     updateMotorProtocolOptions();applyCapabilities();window.firmwareFlasher?.setDetectedBoard?.(state.board);
@@ -1044,15 +1110,41 @@ function line(value){
   if(p[1]==="ERROR"){
     if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"){resetMotorTestUi();toast("Disable the configured ARM switch before motor testing")}
     else if(p[2]==="MOTOR_TEST_DISABLED"){resetMotorTestUi();toast("Motor test interrupted: enable it again")}
+    else if(p[2]==="BLACKBOX_READ"&&blackbox.downloading){
+      const flightId=Number(p[3])||0,sample=Number(p[4])||0,sector=Number(p[5])||0,total=blackbox.flight?.records||0;
+      if(blackbox.flight?.id!==flightId)return;
+      const skip=Math.min(10-sample%10,total-sample);
+      if(skip<=0){finishBlackboxDownload({sample,sector,reason:"INVALID_SD_RANGE",message:"the board returned an invalid SD range"});return}
+      FlightCodeBlackboxLogic.addMissingSector(blackbox.skippedRanges,sample,skip,sector);
+      const next=sample+skip;updateBlackboxDownloadProgress(flightId,next,total);
+      const skipped=FlightCodeBlackboxLogic.missingSectorCount(blackbox.skippedRanges);
+      $("#blackboxDownloadState").textContent=`Scanning flight #${flightId} · ${(next/Math.max(total,1)*100).toFixed(1)}% · ${skipped.toLocaleString()} unreadable SD ${skipped===1?"sector":"sectors"} skipped`;
+      if(next<total)requestBlackboxChunk(flightId,next);else finishBlackboxDownload()
+    }
     else if(p[2]==="BLACKBOX_RECORDING"||p[2]==="BLACKBOX_BUSY"){
       if(blackbox.downloading){blackbox.downloading=false;blackbox.flight=null;$("#blackboxDownloadState").textContent="Blackbox is still finalizing; try again shortly";updateBlackboxControls()}
     }
     else toast(`Board error: ${p.slice(2).join(" ")}`);
   }
 }
-async function readLoop(){
+function processIncomingBytes(value){
+  const incoming=value instanceof Uint8Array?value:new Uint8Array(value);
+  if(state.rxBytes.length){const joined=new Uint8Array(state.rxBytes.length+incoming.length);joined.set(state.rxBytes);joined.set(incoming,state.rxBytes.length);state.rxBytes=joined}else state.rxBytes=incoming;
   const decoder=new TextDecoder();
-  try{while(state.connected&&state.port?.readable){state.reader=state.port.readable.getReader();try{while(state.connected){const{value,done}=await state.reader.read();if(done)break;state.buffer+=decoder.decode(value,{stream:true});const lines=state.buffer.split(/\r?\n/);state.buffer=lines.pop()||"";lines.filter(Boolean).forEach(line)}}finally{state.reader.releaseLock();state.reader=null}}}
+  while(state.rxBytes.length){
+    if(state.binaryTransfer){
+      if(state.rxBytes.length<state.binaryTransfer.bytes)return;
+      const transfer=state.binaryTransfer,payload=state.rxBytes.slice(0,transfer.bytes);
+      state.rxBytes=state.rxBytes.slice(transfer.bytes);state.binaryTransfer=null;receiveBlackboxBinary(transfer,payload);continue;
+    }
+    const newline=state.rxBytes.indexOf(10);if(newline<0)return;
+    let raw=state.rxBytes.slice(0,newline);state.rxBytes=state.rxBytes.slice(newline+1);
+    if(raw.length&&raw.at(-1)===13)raw=raw.slice(0,-1);
+    if(raw.length)line(decoder.decode(raw));
+  }
+}
+async function readLoop(){
+  try{while(state.connected&&state.port?.readable){state.reader=state.port.readable.getReader();try{while(state.connected){const{value,done}=await state.reader.read();if(done)break;processIncomingBytes(value)}}finally{state.reader.releaseLock();state.reader=null}}}
   catch(error){if(state.connected&&!state.closing){log(`Connection ended: ${error.message}`,"SYS");await disconnect()}}
 }
 async function openSerialPort(port){
@@ -1112,7 +1204,7 @@ async function disconnect(){
     if(port)await settleWithin(port.close(),700);
   }
   catch(error){log(`Port closing error: ${error.message}`,"SYS")}
-  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
+  finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",rxBytes:new Uint8Array(0),binaryTransfer:null,heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",firmwareVersion:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
 buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG");if(hasCapability("VTX_CONFIG"))await send("GET_VTX_CONFIG")};
