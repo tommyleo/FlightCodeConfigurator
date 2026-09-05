@@ -67,5 +67,15 @@ const FlightCodeBlackboxLogic=(()=>{
         ?Math.max(1,range.lastSector-range.sector+1):Math.ceil(range.count/10)),0);
   }
 
-  return {stopReasonName,decodeRecord,decodeBinaryRecord,addMissingSector,missingSectorCount};
+  function buildMetadata(core,tuning,pids){
+    if(!core||!tuning||!pids)return null;
+    const t=tuning,value=t[16];
+    const throttleRiseMs=core.version>=3&&Number.isFinite(value)&&value>=0&&value<=1000?value:null;
+    return {...core,pids,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},
+      feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},
+      filters:{gyro:t[9],dterm:t[10],dynamicD:t[15]??0},alignment:t.slice(11,14),
+      motorIdlePercent:t[14],throttleRiseMs};
+  }
+
+  return {stopReasonName,decodeRecord,decodeBinaryRecord,addMissingSector,missingSectorCount,buildMetadata};
 })();

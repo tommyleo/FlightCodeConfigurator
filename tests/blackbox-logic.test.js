@@ -75,3 +75,21 @@ assert.equal(missing[0].lastSector,44632);
 assert.equal(blackbox.missingSectorCount(missing),3);
 
 console.log("Configurator Blackbox logic tests passed");
+
+// Historical metadata must never inherit current UI settings or report off
+// when the value was never recorded.
+const tuning=[480,480,460,.2,0,0,0,.2,50,92,52,0,0,90,5.5,12.5];
+for(const value of [0,10,100,300,1000]){
+  const m=blackbox.buildMetadata({version:3},[...tuning,value],[.155,.2,.0019]);
+  assert.equal(m.throttleRiseMs,value);
+  assert.equal(m.filters.dynamicD,12.5);
+  assert.equal(JSON.parse(JSON.stringify({flightConfiguration:m})).flightConfiguration.throttleRiseMs,value);
+}
+for(const version of [2,3]){
+  for(const value of [undefined,-1,NaN,Infinity,1001]){
+    assert.equal(blackbox.buildMetadata({version},[...tuning,value],[]).throttleRiseMs,null);
+  }
+}
+assert.equal(blackbox.buildMetadata({version:2},[...tuning,0],[]).throttleRiseMs,null);
+assert.equal(blackbox.buildMetadata(null,tuning,[]),null);
+assert.equal(fs.readFileSync("blackbox-logic.js","utf8"),fs.readFileSync("android/app/src/main/assets/configurator/blackbox-logic.js","utf8"));

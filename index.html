@@ -168,6 +168,13 @@
             <label>Dynamic D boost <span>% max · 0 = disabled</span><input id="dynamicDBoost" data-filter type="number" min="0" max="50" step="0.5" value="12.5" disabled></label>
           </div>
         </article>
+        <article class="rates-card">
+          <header><div><small>THROTTLE RESPONSE</small><h2>Throttle rise limit</h2></div>
+            <p>Softens sudden throttle increases. Time for a full 0–100% rise; 0 disables it. A 50-point rise takes half this time. Throttle reduction is immediate and stabilization corrections remain free.</p></header>
+          <div class="rates-fields">
+            <label>Full-scale rise time <span>ms · 0 = disabled</span><input id="throttleRiseMs" data-throttle-ramp type="number" min="0" max="1000" step="1" value="0" disabled></label>
+          </div>
+        </article>
         <div class="actions"><button id="resetButton" class="button ghost" disabled>Restore defaults</button><div>
           <button id="readButton" class="button ghost" disabled>Read again</button>
           <button id="applyButton" class="button secondary" disabled>Apply</button>
@@ -396,11 +403,11 @@
   <script src="quad-renderer.js?v=20260805-2"></script>
   <script src="diagnostic-logic.js?v=20260805-2"></script>
   <script src="attitude-logic.js?v=20260805-2"></script>
-  <script src="blackbox-logic.js?v=20260903-1"></script>
+  <script src="blackbox-logic.js?v=20260905-ramp-log"></script>
   <script src="serial-port-logic.js?v=20260809-1"></script>
   <script src="webusb-serial.js?v=20260817-2"></script>
   <script src="android-usb-serial.js?v=20260824-1"></script>
-<script src="app.js?v=20260903-9"></script>
+<script src="app.js?v=20260905-ramp-log"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>
