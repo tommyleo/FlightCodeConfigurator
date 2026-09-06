@@ -365,7 +365,6 @@ function applyCapabilities(){
   setCapabilityControls("[data-feedforward]","FEEDFORWARD");
   setCapabilityControls("[data-tpa]","TPA");
   setCapabilityControls("[data-filter]","FILTERS");
-  setCapabilityControls("[data-throttle-ramp]","THROTTLE_RAMP");
   setCapabilityControls("[data-alignment],#applyAlignmentButton,#saveAlignmentButton","BOARD_ALIGNMENT");
   setCapabilityControls("#motorProtocol,#applyProtocolButton","MOTOR_PROTOCOL");
   setCapabilityControls("#mainLoopHz","MAIN_LOOP");
@@ -876,11 +875,6 @@ function getFilters(){
   if(!Number.isFinite(dynamicD)||dynamicD<0||dynamicD>50)throw new Error("Dynamic D boost must be between 0% and 50%");
   return {gyro,dterm,dynamicD};
 }
-function throttleRampCommand(){
-  const input=$("#throttleRiseMs"),value=Number(input.value);
-  if(!input.value.trim()||!Number.isFinite(value)||value<0||value>1000)throw new Error("Throttle rise time must be between 0 and 1000 ms");
-  return `SET_THROTTLE_RAMP ${value}`;
-}
 function filtersCommand(){const f=getFilters();return `SET_FILTERS ${f.gyro} ${f.dterm} ${f.dynamicD}`}
 function setActiveTuningProfile(name){
   document.querySelectorAll("[data-tuning-profile]").forEach(button=>button.classList.toggle("active",button.dataset.tuningProfile===name));
@@ -1086,7 +1080,6 @@ function line(value){
   if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
-  if(p[1]==="THROTTLE_RAMP"&&p.length>=4){const value=Number(p[2]);if(Number.isFinite(value)&&value>=0&&value<=1000)$("#throttleRiseMs").value=value;saveState(p[3]==="1"?"Saved to flash":"Unsaved changes",p[3]==="1"?"saved":"dirty");return}
   if(p[1]==="FILTERS"&&p.length>=6){setFilters(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="VTX_CONFIG"&&p.length>=9){setVtxConfig({protocol:p[2],port:p[3],table:p[4],band:p[5],channel:Number(p[6]),power:Number(p[7])},p[8]==="1");return}
   if(p[1]==="VTX_CONFIG"&&p.length>=6){setVtxConfig({protocol:p[2],port:p[3],table:p[4]},p[5]==="1");return}
@@ -1214,9 +1207,9 @@ async function disconnect(){
   finally{Object.assign(state,{port:null,reader:null,writer:null,task:null,buffer:"",rxBytes:new Uint8Array(0),binaryTransfer:null,heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,lastUs:null,loopHz:0,maxLoopPeriodUs:0,calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],closing:false,board:"",firmwareVersion:"",protocol:0,capabilities:new Set()});resetAttitude();buttons.connect.disabled=false;connected(false)}
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
-buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("THROTTLE_RAMP"))await send("GET_THROTTLE_RAMP");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG");if(hasCapability("VTX_CONFIG"))await send("GET_VTX_CONFIG")};
-buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("THROTTLE_RAMP"))await send(throttleRampCommand());if(hasCapability("FILTERS"))await send(filtersCommand())}catch(error){toast(error.message)}};
-buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("THROTTLE_RAMP"))await send(throttleRampCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
+buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG");if(hasCapability("VTX_CONFIG"))await send("GET_VTX_CONFIG")};
+buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand())}catch(error){toast(error.message)}};
+buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){toast(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
 buttons.applyMainLoop.onclick=async()=>{
@@ -1336,5 +1329,3 @@ $("#masterMotorSlider").oninput=event=>{
   sendMotorTest();
 };
 for(let i=0;i<4;i++)$(`#motorTestSlider${i}`).oninput=event=>{$(`#motorTestValue${i}`).textContent=`${event.target.value}%`;sendMotorTest()};
-
-document.querySelectorAll("[data-throttle-ramp]").forEach(input=>input.addEventListener("input",()=>saveState("Local changes","dirty")));
