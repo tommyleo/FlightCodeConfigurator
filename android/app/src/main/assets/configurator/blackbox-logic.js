@@ -31,8 +31,8 @@ const FlightCodeBlackboxLogic=(()=>{
   }
 
   function decodeBinaryRecord(bytes,index,rate=200,batteryCells=0){
-    if(!bytes||bytes.byteLength<48)return null;
-    const view=new DataView(bytes.buffer,bytes.byteOffset,48);
+    if(!bytes||bytes.byteLength!==60)return null;
+    const view=new DataView(bytes.buffer,bytes.byteOffset,60);
     const i16=offset=>view.getInt16(offset,true),u16=offset=>view.getUint16(offset,true);
     const timestampUs=view.getUint32(0,true),flags=view.getUint8(39);
     const gyroRaw=[i16(4),i16(6),i16(8)].map(v=>v/10);
@@ -40,7 +40,10 @@ const FlightCodeBlackboxLogic=(()=>{
     const setpoint=[i16(16),i16(18),i16(20)].map(v=>v/10);
     const dTermUnfiltered=[i16(22),i16(24),i16(26)].map(v=>v/100);
     const dTerm=[i16(28),i16(30),i16(32)].map(v=>v/100);
-    const batteryCentivolts=u16(43);
+    const pTerm=[43,44,45].map(offset=>view.getInt8(offset)/2);
+    const iTerm=[46,47,48].map(offset=>view.getInt8(offset)/2);
+    const ffTerm=[49,50,51].map(offset=>view.getInt8(offset)/2);
+    const batteryCentivolts=u16(52);
     return {t:Number((index/rate).toFixed(5)),gyro,setpoint,
       pid:[view.getInt8(40),view.getInt8(41),view.getInt8(42)].map(v=>v/2),
       motors:[34,35,36,37].map(offset=>Number((view.getUint8(offset)*100/255).toFixed(2))),
@@ -48,8 +51,8 @@ const FlightCodeBlackboxLogic=(()=>{
       mainLoopUs:0,mainLoopHz:0,gyroLoopUs:0,gyroLoopHz:0,
       batteryVoltage:batteryCentivolts/100,
       cellVoltage:batteryCells?Math.floor(batteryCentivolts/batteryCells)/100:0,batteryCells,
-      pTerm:[0,0,0],iTerm:[0,0,0],dTerm,ffTerm:[0,0,0],timestampUs,gyroRaw,
-      dTermUnfiltered,dTermFiltered:dTerm,droppedRecords:u16(45)};
+      pTerm,iTerm,dTerm,ffTerm,timestampUs,gyroRaw,
+      dTermUnfiltered,dTermFiltered:dTerm,droppedRecords:u16(54)};
   }
 
   function addMissingSector(ranges,start,count,sector){

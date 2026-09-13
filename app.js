@@ -191,7 +191,7 @@ function decodeLogRecord(values,index,rate=200){
 function requestBlackboxChunk(flightId,offset){
   const binary=hasCapability("BLACKBOX_BINARY");
   blackbox.requestedOffset=offset;
-  send(`${binary?"GET_BLACKBOX_BINARY":"GET_BLACKBOX_CHUNK"} ${flightId} ${offset} ${binary?40:12}`,false);
+  send(`${binary?"GET_BLACKBOX_BINARY":"GET_BLACKBOX_CHUNK"} ${flightId} ${offset} ${binary?32:12}`,false);
 }
 
 function failBlackboxDownload(message){
@@ -972,7 +972,7 @@ function line(value){
   if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){requestBlackboxChunk(blackbox.flight.id,0);return}
   if(p[1]==="BLACKBOX_BINARY"&&blackbox.downloading&&p.length>=6){
     const flightId=Number(p[2]),offset=Number(p[3]),count=Number(p[4]),recordSize=Number(p[5]);
-    if(blackbox.flight?.id===flightId&&count>=0&&count<=40&&recordSize===48)state.binaryTransfer={flightId,offset,count,recordSize,bytes:count*recordSize};
+    if(blackbox.flight?.id===flightId&&count>=0&&count<=40&&recordSize===60)state.binaryTransfer={flightId,offset,count,recordSize,bytes:count*recordSize};
     return
   }
   if(p[1]==="BLACKBOX_CHUNK_END"&&blackbox.downloading){
