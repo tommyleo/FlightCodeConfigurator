@@ -49,7 +49,7 @@ binaryView.setUint32(0,1234567,true);
 [0,128,255,64,70,3].forEach((value,i)=>binaryView.setUint8(34+i,value));
 [20,-40,50].forEach((value,i)=>binaryView.setInt8(40+i,value));
 [20,-10,6,-4,8,-12,2,-6,10].forEach((value,i)=>binaryView.setInt8(43+i,value));
-binaryView.setUint16(52,1480,true);binaryView.setUint16(54,7,true);binaryView.setUint8(56,4);
+binaryView.setUint16(52,1480,true);binaryView.setUint16(54,7,true);binaryView.setUint8(56,5);
 const binaryRecord=blackbox.decodeBinaryRecord(binary,1,1000,4);
 assert.equal(binaryRecord.t,0.001);
 assert.equal(binaryRecord.timestampUs,1234567);
@@ -80,20 +80,10 @@ assert.equal(blackbox.missingSectorCount(missing),3);
 
 console.log("Configurator Blackbox logic tests passed");
 
-// Historical metadata must never inherit current UI settings or report off
-// when the value was never recorded.
 const tuning=[480,480,460,.2,0,0,0,.2,50,92,52,0,0,90,5.5,12.5];
-for(const value of [0,10,100,300,1000]){
-  const m=blackbox.buildMetadata({version:3},[...tuning,value],[.155,.2,.0019]);
-  assert.equal(m.throttleRiseMs,value);
-  assert.equal(m.filters.dynamicD,12.5);
-  assert.equal(JSON.parse(JSON.stringify({flightConfiguration:m})).flightConfiguration.throttleRiseMs,value);
-}
-for(const version of [2,3]){
-  for(const value of [undefined,-1,NaN,Infinity,1001]){
-    assert.equal(blackbox.buildMetadata({version},[...tuning,value],[]).throttleRiseMs,null);
-  }
-}
-assert.equal(blackbox.buildMetadata({version:2},[...tuning,0],[]).throttleRiseMs,null);
+const metadata=blackbox.buildMetadata({version:4},tuning,[.155,.2,.0019]);
+assert.equal(metadata.version,4);
+assert.equal(metadata.filters.dynamicD,12.5);
+assert.equal(metadata.motorIdlePercent,5.5);
 assert.equal(blackbox.buildMetadata(null,tuning,[]),null);
 assert.equal(fs.readFileSync("blackbox-logic.js","utf8"),fs.readFileSync("android/app/src/main/assets/configurator/blackbox-logic.js","utf8"));

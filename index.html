@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
-  <title>FlightCode Configurator 1.1.0</title>
+  <title>FlightCode Configurator 1.2.0</title>
   <link rel="stylesheet" href="styles.css?v=20260903-1">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
@@ -14,7 +14,7 @@
   <header class="topbar">
     <div class="brand">
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
-      <div><b>FlightCode</b><small>CONFIGURATOR · v1.1.0</small></div>
+      <div><b>FlightCode</b><small>CONFIGURATOR · v1.2.0</small></div>
     </div>
     <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
@@ -249,8 +249,7 @@
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="2"><span><b>Flight timer</b><small>03:24◷</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="3"><span><b>FlightCode logo</b><small>FLIGHTCODE</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="4"><span><b>Pilot name</b><small id="osdPilotPreview">PILOT</small></span><i aria-hidden="true"></i></button>
-              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="5"><span><b>VTX band / channel</b><small>VTX R1</small></span><i aria-hidden="true"></i></button>
-              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="6"><span><b>VTX power</b><small>VTX 25MW</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="5"><span><b>VTX</b><small>F:3:200</small></span><i aria-hidden="true"></i></button>
               <label class="osd-pilot-field"><span>Pilot name</span><input id="osdPilotName" maxlength="12" placeholder="PILOT" autocomplete="off" disabled></label>
             </div>
             <div class="osd-preview-wrap">
@@ -396,11 +395,11 @@
   <script src="quad-renderer.js?v=20260805-2"></script>
   <script src="diagnostic-logic.js?v=20260805-2"></script>
   <script src="attitude-logic.js?v=20260805-2"></script>
-  <script src="blackbox-logic.js?v=20260905-ramp-log"></script>
+  <script src="blackbox-logic.js?v=20260919-log-v9"></script>
   <script src="serial-port-logic.js?v=20260809-1"></script>
   <script src="webusb-serial.js?v=20260817-2"></script>
   <script src="android-usb-serial.js?v=20260824-1"></script>
-<script src="app.js?v=20260905-ramp-log"></script>
+<script src="app.js?v=20260919-log-v9"></script>
   <script src="pico-flasher.js"></script>
   <script src="firmware-flasher.js?v=20260810-1"></script>
 </body>

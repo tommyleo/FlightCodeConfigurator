@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.1.0",MINIMUM_FIRMWARE_VERSION="1.1.0";
+const CONFIGURATOR_VERSION="1.2.0",MINIMUM_FIRMWARE_VERSION="1.2.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -11,10 +11,9 @@ const osdElements=[
   {label:"Flight timer",sample:"03:24◷"},
   {label:"FlightCode logo",sample:"FLIGHTCODE"},
   {label:"Pilot name",sample:"PILOT"}
-  ,{label:"VTX band / channel",sample:"VTX R1"}
-  ,{label:"VTX power",sample:"VTX 25MW"}
+  ,{label:"VTX",sample:"F:3:200"}
 ];
-const osdLayout={mask:1,positions:[31,61,51,340,369,55,85],pilot:"PILOT",selected:0};
+const osdLayout={mask:1,positions:[31,61,51,340,369,55],pilot:"PILOT",selected:0};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -248,14 +247,14 @@ function finishBlackboxDownload(incomplete=null){
   const partial=Boolean(incomplete)||skippedSectors>0;
   const timestamped=blackbox.records.length&&Number.isFinite(blackbox.records[0].timestampUs);
   if(timestamped){const origin=blackbox.records[0].timestampUs>>>0;blackbox.records.forEach(record=>{record.t=Number((((record.timestampUs>>>0)-origin>>>0)/1000000).toFixed(6))})}
-  const file={format:"FlightCode-Flight-Log",version:8,source:"persistent Blackbox",flightId:flight.id,
+  const file={format:"FlightCode-Flight-Log",version:9,source:"persistent Blackbox",flightId:flight.id,
     created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||flight.rate||200,
     alignment:metadata?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:metadata?.motorDirection||$("#motorDirection").value,
     rates:metadata?.rates||getRates(),feedforward:metadata?.feedforward||getFeedforward(),
     pids:metadata?.pids||getPids(),tpa:metadata?.tpa||getTpa(),
     filters:metadata?.filters||(hasCapability("FILTERS")?getFilters():undefined),
-    flightConfiguration:metadata||null,throttleRiseMs:metadata?.throttleRiseMs??null,stopReason:stopReasonName(flight.stopFlag),
+    flightConfiguration:metadata||null,stopReason:stopReasonName(flight.stopFlag),
     incomplete:partial,downloadedSamples:blackbox.records.length,
     expectedSamples:flight.records,
     downloadInterruption:incomplete,
@@ -306,7 +305,7 @@ function renderOsdLayout(){
   $("#osdPilotName").value=osdLayout.pilot;$("#osdPilotPreview").textContent=osdLayout.pilot||"PILOT";
 }
 function setOsdLayout(mask,positions,pilot,saved=false){
-  osdLayout.mask=mask&31;osdLayout.positions=positions.map(value=>Math.max(0,Math.min(479,Number(value)||0)));
+  osdLayout.mask=mask&63;osdLayout.positions=positions.map(value=>Math.max(0,Math.min(479,Number(value)||0)));
   osdLayout.pilot=(pilot||"").replaceAll("_"," ").toUpperCase().replace(/[^A-Z0-9 -]/g,"").slice(0,12);
   state.osdDirty=false;renderOsdLayout();$("#osdConfigState").textContent=saved?"Saved to flash":"Unsaved changes";
 }
@@ -800,13 +799,13 @@ function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
   const m=flightLog.metadata;
-  const file={format:"FlightCode-Flight-Log",version:7,created:new Date().toISOString(),
+  const file={format:"FlightCode-Flight-Log",version:9,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",sampleRateHz:m?.logRateHz||flightLog.rate,
     alignment:m?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:m?.motorDirection||$("#motorDirection").value,rates:m?.rates||getRates(),
     feedforward:m?.feedforward||getFeedforward(),
     pids:m?.pids||getPids(),tpa:m?.tpa||getTpa(),stopReason:last?.stopReason||"UNKNOWN",
-    flightConfiguration:m,throttleRiseMs:m?.throttleRiseMs??null,
+    flightConfiguration:m,
     receiverDiagnostics:flightLog.receiverDiagnostics,
     blackboxDiagnostics:flightLog.blackboxDiagnostics,
     samples:flightLog.records};
@@ -908,12 +907,8 @@ function line(value){
     $("#osdDetectionState").title=state.osdDigital?"HDZero MSP DisplayPort · 30 × 16 centered canvas":`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
   }
-  if(p[1]==="OSD_LAYOUT"&&p.length>=12){
-    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,10).map(Number),p[10]==="-"?"":p[10],p[11]==="1");
-    return
-  }
-  if(p[1]==="OSD_LAYOUT"&&p.length>=10){
-    if(!state.osdDirty)setOsdLayout(Number(p[2]),[...p.slice(3,8).map(Number),55,85],p[8]==="-"?"":p[8],p[9]==="1");
+  if(p[1]==="OSD_LAYOUT"&&p.length>=11){
+    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,9).map(Number),p[9]==="-"?"":p[9],p[10]==="1");
     return
   }
   if(p[1]==="BLACKBOX_STATUS"){
