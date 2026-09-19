@@ -13,7 +13,7 @@ const osdElements=[
   {label:"Pilot name",sample:"PILOT"}
   ,{label:"VTX",sample:"F:3:200"}
 ];
-const osdLayout={mask:1,positions:[31,61,51,340,369,55],pilot:"PILOT",selected:0};
+const osdLayout={mask:1,positions:[31,61,51,340,369,55,55],pilot:"PILOT",selected:0};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -446,7 +446,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369,55,55],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -907,8 +907,8 @@ function line(value){
     $("#osdDetectionState").title=state.osdDigital?"HDZero MSP DisplayPort · 30 × 16 centered canvas":`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
     if(available&&!wasAvailable)toast(`OSD detected · ${p[5]||"PAL"}`);return
   }
-  if(p[1]==="OSD_LAYOUT"&&p.length>=11){
-    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,9).map(Number),p[9]==="-"?"":p[9],p[10]==="1");
+  if(p[1]==="OSD_LAYOUT"&&p.length>=12){
+    if(!state.osdDirty)setOsdLayout(Number(p[2]),p.slice(3,10).map(Number),p[10]==="-"?"":p[10],p[11]==="1");
     return
   }
   if(p[1]==="BLACKBOX_STATUS"){
@@ -1233,7 +1233,7 @@ buttons.applyMotorIdle.onclick=async()=>{
 buttons.applyReceiver.onclick=async()=>{try{const config=getReceiverConfig();await send(receiverCommand());state.activeReceiverProtocol=config.protocol;state.activeReceiverPort=config.port;updateDfuButton()}catch(error){toast(error.message)}};
 buttons.applyVtx.onclick=async()=>{try{await send(vtxCommand());$("#vtxConfigState").textContent="Applied in RAM · save and reboot"}catch(error){toast(error.message)}};
 function osdCommand(){return `SET_OSD_ENABLED ${$("#osdEnabled").checked?1:0}`}
-function osdLayoutCommand(){const pilot=(osdLayout.pilot||"-").replaceAll(" ","_");return `SET_OSD_LAYOUT ${osdLayout.mask} ${osdLayout.positions.join(" ")} ${pilot}`}
+function osdLayoutCommand(){const pilot=(osdLayout.pilot||"-").replaceAll(" ","_"),positions=osdLayout.positions.slice(0,6);positions.push(positions[5]);return `SET_OSD_LAYOUT ${osdLayout.mask} ${positions.join(" ")} ${pilot}`}
 function markOsdDirty(){state.osdDirty=true;$("#osdConfigState").textContent="Local changes"}
 $("#osdEnabled").onchange=markOsdDirty;
 $("#osdPilotName").oninput=event=>{osdLayout.pilot=event.target.value.toUpperCase().replace(/[^A-Z0-9 -]/g,"").slice(0,12);osdLayout.mask|=1<<4;osdLayout.selected=4;markOsdDirty();renderOsdLayout()};
