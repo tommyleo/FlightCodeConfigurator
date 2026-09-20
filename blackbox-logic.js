@@ -44,15 +44,20 @@ const FlightCodeBlackboxLogic=(()=>{
     const iTerm=[46,47,48].map(offset=>view.getInt8(offset)/2);
     const ffTerm=[49,50,51].map(offset=>view.getInt8(offset)/2);
     const batteryCentivolts=u16(52);
+    const packedTiming=view.getUint8(56)|(view.getUint8(57)<<8)|(view.getUint8(58)<<16);
+    const mainLoopUs=packedTiming&0xfff,gyroLoopUs=(packedTiming>>>12)&0xfff;
+    const packedVersion=view.getUint8(59);
+    const logFormatVersion=`${packedVersion>>>4}.${packedVersion&0xf}`;
     return {t:Number((index/rate).toFixed(5)),gyro,setpoint,
       pid:[view.getInt8(40),view.getInt8(41),view.getInt8(42)].map(v=>v/2),
       motors:[34,35,36,37].map(offset=>Number((view.getUint8(offset)*100/255).toFixed(2))),
       throttle:view.getUint8(38)/2,mixerSaturated:(flags&1)!==0,stopReason:stopReasonName(flags),
-      mainLoopUs:0,mainLoopHz:0,gyroLoopUs:0,gyroLoopHz:0,
+      mainLoopUs,mainLoopHz:mainLoopUs?Number((1000000/mainLoopUs).toFixed(2)):0,
+      gyroLoopUs,gyroLoopHz:gyroLoopUs?Number((1000000/gyroLoopUs).toFixed(2)):0,
       batteryVoltage:batteryCentivolts/100,
       cellVoltage:batteryCells?Math.floor(batteryCentivolts/batteryCells)/100:0,batteryCells,
       pTerm,iTerm,dTerm,ffTerm,timestampUs,gyroRaw,
-      dTermUnfiltered,dTermFiltered:dTerm,droppedRecords:u16(54)};
+      dTermUnfiltered,dTermFiltered:dTerm,droppedRecords:u16(54),logFormatVersion};
   }
 
   function addMissingSector(ranges,start,count,sector){

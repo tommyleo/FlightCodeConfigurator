@@ -247,7 +247,7 @@ function finishBlackboxDownload(incomplete=null){
   const partial=Boolean(incomplete)||skippedSectors>0;
   const timestamped=blackbox.records.length&&Number.isFinite(blackbox.records[0].timestampUs);
   if(timestamped){const origin=blackbox.records[0].timestampUs>>>0;blackbox.records.forEach(record=>{record.t=Number((((record.timestampUs>>>0)-origin>>>0)/1000000).toFixed(6))})}
-  const file={format:"FlightCode-Flight-Log",version:9,source:"persistent Blackbox",flightId:flight.id,
+  const file={format:"FlightCode-Flight-Log",version:"1.0",source:"persistent Blackbox",flightId:flight.id,
     created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||flight.rate||200,
     alignment:metadata?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:metadata?.motorDirection||$("#motorDirection").value,
@@ -799,7 +799,7 @@ function finishFlightLogDownload(){
   flightLog.downloading=false;
   const last=flightLog.records.at(-1);
   const m=flightLog.metadata;
-  const file={format:"FlightCode-Flight-Log",version:9,created:new Date().toISOString(),
+  const file={format:"FlightCode-Flight-Log",version:"1.0",created:new Date().toISOString(),
     board:state.board||"UNKNOWN",sampleRateHz:m?.logRateHz||flightLog.rate,
     alignment:m?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:m?.motorDirection||$("#motorDirection").value,rates:m?.rates||getRates(),
@@ -950,7 +950,7 @@ function line(value){
   }
   if(p[1]==="BLACKBOX_METADATA_CORE"&&blackbox.downloading){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
-    f.metadataParts.core={version:Number(p[3]),mainLoopHz:Number(p[4]),gyroRateHz:Number(p[5]),logRateHz:Number(p[6]),motorProtocol:Number(p[7]),motorDirection:Number(p[8])?"REVERSED":"NORMAL",receiverProtocol:Number(p[9]),batteryCells:Number(p[10]),initialBatteryVoltage:Number(p[11])};return
+    f.metadataParts.core={version:Number(p[3]),mainLoopHz:Number(p[4]),gyroRateHz:Number(p[5]),logRateHz:Number(p[6]),motorProtocol:Number(p[7]),motorDirection:Number(p[8])?"REVERSED":"NORMAL",receiverProtocol:Number(p[9]),batteryCells:Number(p[10]),initialBatteryVoltage:Number(p[11]),logFormatVersion:p.length>=14?`${Number(p[12])}.${Number(p[13])}`:"1.0"};return
   }
   if(p[1]==="BLACKBOX_METADATA_PIDS"&&blackbox.downloading){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;f.metadataParts.pids=p.slice(3).map(Number);return
@@ -1025,7 +1025,7 @@ function line(value){
     updateFlightLogUi();return;
   }
   if(p[1]==="FLIGHT_LOG_METADATA_CORE"&&flightLog.downloading){
-    flightLog.metadataParts.core={version:Number(p[2]),mainLoopHz:Number(p[3]),gyroRateHz:Number(p[4]),logRateHz:Number(p[5]),motorProtocol:Number(p[6]),motorDirection:Number(p[7])?"REVERSED":"NORMAL",receiverProtocol:Number(p[8]),batteryCells:Number(p[9]),initialBatteryVoltage:Number(p[10])};return
+    flightLog.metadataParts.core={version:Number(p[2]),mainLoopHz:Number(p[3]),gyroRateHz:Number(p[4]),logRateHz:Number(p[5]),motorProtocol:Number(p[6]),motorDirection:Number(p[7])?"REVERSED":"NORMAL",receiverProtocol:Number(p[8]),batteryCells:Number(p[9]),initialBatteryVoltage:Number(p[10]),logFormatVersion:p.length>=13?`${Number(p[11])}.${Number(p[12])}`:"1.0"};return
   }
   if(p[1]==="FLIGHT_LOG_METADATA_PIDS"&&flightLog.downloading){flightLog.metadataParts.pids=p.slice(2).map(Number);return}
   if(p[1]==="FLIGHT_LOG_METADATA_TUNING"&&flightLog.downloading){flightLog.metadataParts.tuning=p.slice(2).map(Number);return}
