@@ -21,6 +21,10 @@ assert.doesNotMatch(connectWebUsb[1], /\bp\s*\[/,
   "connectWebUsb() must not read tokens from the serial message parser");
 assert.match(source, /if\(p\[1\]==="GYRO_RATE"\)/,
   "gyro rate messages must be handled by the serial parser");
+assert.match(source, /if\(p\[1\]==="GYRO_RATES"\)/,
+  "supported gyro rates must be handled by the serial parser");
+assert.match(source, /SET_MAIN_LOOP.*mainLoopHz.*gyroRateHz/,
+  "scheduler and gyro rates must be saved together");
 assert.match(line[1], /if\(p\[1\]==="VBAT_MULTIPLIER"\)/,
   "battery multiplier messages must be handled by the serial parser");
 

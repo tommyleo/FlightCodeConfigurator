@@ -80,9 +80,10 @@ Android Serial Service availability. Desktop Chrome and Edge continue to use
 Web Serial. iOS does not expose the wired connection used by this configurator.
 
 The configurator displays IMU telemetry, 16 SBUS channels, and motor outputs.
-Setup distinguishes the selectable main-scheduler frequency from the live
-gyroscope/PID frequency. PID updates are synchronized to fresh gyroscope
-samples, while motor output and timed system tasks follow the main scheduler.
+Setup provides separate scheduler and gyroscope/PID frequency selectors using
+the rates reported by the connected firmware. The gyro/PID rate cannot exceed
+the scheduler rate. PID updates are synchronized to fresh gyroscope samples,
+while motor output and timed system tasks follow the main scheduler.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
@@ -91,6 +92,10 @@ DisplayPort overlay using an HDZero-compatible 30 × 16 canvas centered in the
 HD display. The VTX tab selects `HDZERO_MSP` and the connected UART; Flywoo HD
 defaults to UART6 and Halo defaults to UART5 on a fresh firmware configuration.
 Analog targets continue to use their MAX7456/AT7456E backend.
+On the new SEQURE H743 V2 target, the analog OSD editor can display battery
+current as a whole-ampere value such as `45 A`, provided the current-sensor
+input has been connected and calibrated. The board target has compiled but
+has not yet been validated on physical hardware.
 
 On CLRACINGF4, the Blackbox page lists microSD flights retained across power
 cycles. On both Flywoo Nano targets it manages the internal 16 MiB flash and
