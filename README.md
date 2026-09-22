@@ -91,8 +91,9 @@ On `FLYWOOF405NANO` and `HDZERO_HALO`, the Camera OSD tab controls the MSP
 DisplayPort overlay using an HDZero-compatible 30 × 16 canvas centered in the
 HD display. The VTX tab selects `HDZERO_MSP` and the connected UART; Flywoo HD
 defaults to UART6 and Halo defaults to UART5 on a fresh firmware configuration.
-Analog targets continue to use their MAX7456/AT7456E backend.
-On the new SEQURE H743 V2 target, the analog OSD editor can display battery
+All supported STM32 targets can use MSP DisplayPort on a free TX UART.
+Boards with a MAX7456/AT7456E chip can also use analog OSD. On the SEQURE H743 V2 target,
+the OSD editor can display battery
 current as a whole-ampere value such as `45 A`, provided the current-sensor
 input has been connected and calibrated. The board target has compiled but
 has not yet been validated on physical hardware.
@@ -119,7 +120,7 @@ or disabled after connection.
 | Guided IMU calibration | Yes | Yes | Yes | Yes | Yes |
 | Guided PID/mixer simulation | Yes | Yes | Yes | Yes | Yes |
 | Battery voltage telemetry | Yes | Yes | Yes | Yes | Yes |
-| OSD layout editor | Analog, drag-and-drop | Analog, drag-and-drop | MSP DisplayPort, 30 × 16 centered | Analog, drag-and-drop | Firmware dependent |
+| OSD layout editor | Analog / MSP DisplayPort | Analog / MSP DisplayPort | MSP DisplayPort, 30 × 16 centered | Analog / MSP DisplayPort | Firmware dependent |
 | RAM flight-log download | Yes | Yes | Yes | Yes | Yes |
 | Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | 16 MiB internal flash, latest flight | No |
 | Blackbox write/session diagnostics | No | Storage status | Yes | Yes | No |
