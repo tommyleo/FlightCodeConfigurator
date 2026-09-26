@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
-  <title>FlightCode Configurator 1.2.0</title>
+  <title>FlightCode Configurator 1.4.0</title>
   <link rel="stylesheet" href="styles.css?v=20260903-1">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
@@ -14,7 +14,7 @@
   <header class="topbar">
     <div class="brand">
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
-      <div><b>FlightCode</b><small>CONFIGURATOR · v1.2.0</small></div>
+      <div><b>FlightCode</b><small>CONFIGURATOR · v1.4.0</small></div>
     </div>
     <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
@@ -163,7 +163,7 @@
           <header><div><small>NOISE CONTROL</small><h2>Gyroscope and D-term filters</h2></div>
             <p>Lower frequencies reduce vibration reaching the controller. Dynamic D adds only the selected maximum boost during fast rotations or propwash.</p></header>
           <div class="rates-fields filter-fields">
-            <label>Gyro low-pass <span>Hz</span><input id="gyroLpfHz" data-filter type="number" min="50" max="250" step="5" value="100" disabled></label>
+            <label>Gyro low-pass <span>Hz</span><input id="gyroLpfHz" data-filter type="number" min="50" max="250" step="1" value="100" disabled></label>
             <label>D-term low-pass <span>Hz</span><input id="dtermLpfHz" data-filter type="number" min="20" max="200" step="5" value="60" disabled></label>
             <label>Dynamic D boost <span>% max · 0 = disabled</span><input id="dynamicDBoost" data-filter type="number" min="0" max="50" step="0.5" value="12.5" disabled></label>
           </div>
@@ -181,8 +181,8 @@
             <p>The protocol can only be changed while the quad is disarmed.</p></div>
           <div class="protocol-control">
             <select id="motorProtocol" disabled>
-              <option value="DSHOT300">DSHOT300</option>
-              <option value="DSHOT600" selected>DSHOT600</option>
+              <option value="DSHOT300" selected>DSHOT300</option>
+              <option value="DSHOT600">DSHOT600</option>
               <option value="DSHOT1200">DSHOT1200</option>
             </select>
             <button id="applyProtocolButton" class="button secondary protocol-action" disabled>Apply<br>protocol</button>

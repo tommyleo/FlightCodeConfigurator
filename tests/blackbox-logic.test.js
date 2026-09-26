@@ -89,8 +89,8 @@ assert.equal(blackbox.missingSectorCount(missing),3);
 console.log("Configurator Blackbox logic tests passed");
 
 const tuning=[480,480,460,.2,0,0,0,.2,50,92,52,0,0,90,5.5,12.5];
-const metadata=blackbox.buildMetadata({version:4},tuning,[.155,.2,.0019]);
-assert.equal(metadata.version,4);
+const metadata=blackbox.buildMetadata({version:5},tuning,[155,200,190]);
+assert.equal(metadata.version,5);
 assert.equal(metadata.filters.dynamicD,12.5);
 assert.equal(metadata.motorIdlePercent,5.5);
 assert.equal(blackbox.buildMetadata(null,tuning,[]),null);

@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.2.0",MINIMUM_FIRMWARE_VERSION="1.2.0";
+const CONFIGURATOR_VERSION="1.4.0",MINIMUM_FIRMWARE_VERSION="1.4.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -54,17 +54,17 @@ const pidDiagnostic={running:false,stage:-1,stageStarted:0,readyAt:0,samples:[],
 const flightLog={count:0,rate:200,recording:false,downloading:false,records:[],receiverDiagnostics:null,blackboxDiagnostics:null,metadata:null,metadataParts:{}};
 const blackbox={flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false,downloadStartedAt:0,lastProgressUiAt:0,requestedOffset:0,skippedRanges:[]};
 const tuningProfiles={
-  balanced:{label:"BALANCED",pids:[.1005,.2,.0010,.1005,.2,.0008,.155,.25,0],rates:[500,500,400],expo:.35,ff:[.022,.022,.013],tpa:[20,70],filters:[90,50,12.5]},
-  racing:{label:"RACING",pids:[.1005,.2,.0009,.1005,.2,.0007,.155,.25,0],rates:[420,420,350],expo:.30,ff:[.025,.025,.015],tpa:[20,70],filters:[90,50,10]},
-  freestyle:{label:"FREESTYLE",pids:[.1005,.2,.0011,.1005,.2,.0009,.155,.25,0],rates:[650,650,500],expo:.40,ff:[.020,.020,.012],tpa:[20,65],filters:[90,50,15]}
+  balanced:{label:"BALANCED",pids:[101,200,100,101,200,80,155,250,0],rates:[500,500,400],expo:.35,ff:[22,22,13],tpa:[20,70],filters:[90,50,12.5]},
+  racing:{label:"RACING",pids:[101,200,90,101,200,70,155,250,0],rates:[420,420,350],expo:.30,ff:[25,25,15],tpa:[20,70],filters:[90,50,10]},
+  freestyle:{label:"FREESTYLE",pids:[101,200,110,101,200,90,155,250,0],rates:[650,650,500],expo:.40,ff:[20,20,12],tpa:[20,65],filters:[90,50,15]}
 };
 const $=s=>document.querySelector(s);
 
 axes.forEach(([key,label],axis)=>{
   const card=document.createElement("article");card.className="axis-card";
   card.innerHTML=`<header><b>${label}</b><small>ASSE 0${axis+1}</small></header><div class="axis-fields">${
-    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="1000" step="0.00001" value="0.00000" disabled></div>`).join("")
-  }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1" step="0.001" value="0.000" disabled></div></div>`;
+    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="${term==="D"?5000:2000}" step="1" value="0" disabled></div>`).join("")
+  }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1000" step="1" value="0" disabled></div></div>`;
   $("#pidGrid").append(card);
 });
 for(let i=0;i<16;i++){
@@ -915,8 +915,9 @@ function telemetry(parts){
   if(firstTelemetry||wasSignal!==signal)badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
   if(firstTelemetry||wasArmed!==armed||wasCalibrated!==calibrated)badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRATING",armed?"armed":calibrated?"online":"");
 }
-function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>$(`#${key}${term}`).value=Number(values[i++]).toFixed(5)))}
-function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value);if(!Number.isFinite(value)||value<0||value>1000)throw new Error(`Invalid ${label} ${term} value`);return Number(value.toFixed(5))}))}
+function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>{$(`#${key}${term}`).value=Math.round(Number(values[i++]))}))}
+function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value),maximum=term==="D"?5000:2000;if(!Number.isInteger(value)||value<0||value>maximum)throw new Error(`Invalid ${label} ${term} value`);return value}))}
+function pidsCommand(){return `SET_PIDS ${getPids().join(" ")}`}
 function setRates(values){["rollRate","pitchRate","yawRate"].forEach((id,i)=>$(`#${id}`).value=Number(values[i]).toFixed(0));$("#rateExpo").value=Number(values[3]).toFixed(2)}
 function getRates(){
   const values=["rollRate","pitchRate","yawRate","rateExpo"].map(id=>Number($(`#${id}`).value));
@@ -925,10 +926,10 @@ function getRates(){
   return {roll:values[0],pitch:values[1],yaw:values[2],expo:values[3]};
 }
 function ratesCommand(){const r=getRates();return `SET_RATES ${r.roll} ${r.pitch} ${r.yaw} ${r.expo}`}
-function setFeedforward(values){axes.forEach(([key],i)=>$(`#${key}FF`).value=Number(values[i]).toFixed(3))}
+function setFeedforward(values){axes.forEach(([key],i)=>{$(`#${key}FF`).value=Math.round(Number(values[i]))})}
 function getFeedforward(){
   const values=axes.map(([key])=>Number($(`#${key}FF`).value));
-  if(values.some(v=>!Number.isFinite(v)||v<0||v>1))throw new Error("Feedforward must be between 0 and 1");
+  if(values.some(v=>!Number.isInteger(v)||v<0||v>1000))throw new Error("Feedforward must be a whole number between 0 and 1000");
   return {roll:values[0],pitch:values[1],yaw:values[2]};
 }
 function feedforwardCommand(){const f=getFeedforward();return `SET_FEEDFORWARD ${f.roll} ${f.pitch} ${f.yaw}`}
@@ -1152,9 +1153,9 @@ function line(value){
     if(next<flightLog.count)send(`GET_FLIGHT_LOG_CHUNK ${next} 8`,false);else finishFlightLogDownload();
     return;
   }
-  if(p[1]==="PIDS"&&p.length>=12){setPids(p.slice(2,11));setActiveTuningProfile(null);saveState(p[11]==="1"?"Saved to flash":"Unsaved changes",p[11]==="1"?"saved":"dirty");return}
+  if(p[1]==="PIDS"&&p.length>=12){setPids(p.slice(2,11),true);setActiveTuningProfile(null);saveState(p[11]==="1"?"Saved to flash":"Unsaved changes",p[11]==="1"?"saved":"dirty");return}
   if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
-  if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
+  if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5),true);saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}
   if(p[1]==="FILTERS"&&p.length>=6){setFilters(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="VTX_CONFIG"&&p.length>=9){setVtxConfig({protocol:p[2],port:p[3],table:p[4],band:p[5],channel:Number(p[6]),power:Number(p[7])},p[8]==="1");return}
@@ -1186,6 +1187,16 @@ function line(value){
     }else toast(p[2]==="ENTER_DFU"?"Starting bootloader mode…":["SAVE_PIDS","SAVE_SETTINGS"].includes(p[2])?"Settings saved to flash":p[2]==="SET_PIDS"?"PIDs applied":"Values updated");
   }
   if(p[1]==="ERROR"){
+    if(p[2]==="BLACKBOX_RECORDING"||p[2]==="BLACKBOX_BUSY"){
+      const message="Blackbox is still finalizing; try again shortly";
+      $("#blackboxMessage").textContent=message;
+      if(blackbox.downloading){
+        blackbox.downloading=false;blackbox.flight=null;
+        $("#blackboxDownloadState").textContent=message;
+      }
+      updateBlackboxControls();
+      return;
+    }
     showError(boardErrorMessage(p));
     if(p[2]==="ARMED"||p[2]==="ARM_SWITCH"||p[2]==="MOTOR_TEST_DISABLED")resetMotorTestUi();
     if(p[2]==="BLACKBOX_READ"&&blackbox.downloading){
@@ -1198,9 +1209,6 @@ function line(value){
       const skipped=FlightCodeBlackboxLogic.missingSectorCount(blackbox.skippedRanges);
       $("#blackboxDownloadState").textContent=`Scanning flight #${flightId} · ${(next/Math.max(total,1)*100).toFixed(1)}% · ${skipped.toLocaleString()} unreadable SD ${skipped===1?"sector":"sectors"} skipped`;
       if(next<total)requestBlackboxChunk(flightId,next);else finishBlackboxDownload()
-    }
-    if(p[2]==="BLACKBOX_RECORDING"||p[2]==="BLACKBOX_BUSY"){
-      if(blackbox.downloading){blackbox.downloading=false;blackbox.flight=null;$("#blackboxDownloadState").textContent="Blackbox is still finalizing; try again shortly";updateBlackboxControls()}
     }
   }
 }
@@ -1285,8 +1293,8 @@ async function disconnect(){
 }
 buttons.connect.onclick=()=>{if(state.closing)return;return state.connected?disconnect():connect()};
 buttons.read.onclick=async()=>{if(hasCapability("PIDS"))await send("GET_PIDS");if(hasCapability("RATES"))await send("GET_RATES");if(hasCapability("FEEDFORWARD"))await send("GET_FEEDFORWARD");if(hasCapability("TPA"))await send("GET_TPA");if(hasCapability("FILTERS"))await send("GET_FILTERS");if(hasCapability("RECEIVER_CONFIG"))await send("GET_RECEIVER_CONFIG");if(hasCapability("VTX_CONFIG"))await send("GET_VTX_CONFIG")};
-buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand())}catch(error){showError(error.message)}};
-buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(`SET_PIDS ${getPids().join(" ")}`);if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){showError(error.message)}};
+buttons.apply.onclick=async()=>{try{if(hasCapability("PIDS"))await send(pidsCommand());if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand())}catch(error){showError(error.message)}};
+buttons.save.onclick=async()=>{try{if(hasCapability("PIDS"))await send(pidsCommand());if(hasCapability("RATES"))await send(ratesCommand());if(hasCapability("FEEDFORWARD"))await send(feedforwardCommand());if(hasCapability("TPA"))await send(tpaCommand());if(hasCapability("FILTERS"))await send(filtersCommand());await send("SAVE_SETTINGS")}catch(error){showError(error.message)}};
 buttons.reset.onclick=()=>send("RESET_PIDS");
 buttons.applyProtocol.onclick=async()=>{await send(`SET_MOTOR_PROTOCOL ${$("#motorProtocol").value}`);await send("SAVE_SETTINGS")};
 $("#mainLoopHz").onchange=updateGyroRateOptions;
