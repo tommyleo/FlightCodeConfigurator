@@ -52,7 +52,7 @@
     const bodyCrown=[[-.4,-.5],[.4,-.5],[.48,.4],[.3,.56],[0,.67],[-.3,.56],[-.48,.4]];
     faces.push(...prism(bodyBase,-.2,.04,"#09151b","#27434d"));
     faces.push(...prism(bodyCrown,.04,.25,"#1d3540","#52727d"));
-    /* Viewed from above: M4/M2 front, M3/M1 rear (Betaflight Quad X order). */
+    /* Viewed from above: M4/M2 front, M3/M1 rear (Quad X motor order). */
     const motors=[[-1.48,1.42,4],[1.48,1.42,2],[-1.48,-1.42,3],[1.48,-1.42,1]];
     motors.forEach(([x,y])=>{
       faces.push(...cylinder(x,y,.02,.26,.23));

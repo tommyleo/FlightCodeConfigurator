@@ -127,8 +127,7 @@ or disabled after connection.
 | Firmware update | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | RP2350 BOOTSEL/UF2 |
 
 On CLRACINGF4, both Flywoo Nano targets and FlightCodePI, Setup exposes a persistent VBAT multiplier
-for final voltage calibration. The firmware starts from Betaflight's standard
-scale 110, while the multiplier defaults to 1.000.
+for final voltage calibration. The firmware uses a nominal 11:1 voltage-divider ratio, while the multiplier defaults to 1.000.
 
 The Flywoo Blackbox page exposes flash readiness, used bytes, dropped records,
 the retained-flight catalog, JSON download, erase, physical **Write test** and
