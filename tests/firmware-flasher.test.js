@@ -6,16 +6,28 @@ const source = fs.readFileSync("firmware-flasher.js", "utf8");
 const context = vm.createContext({ console });
 vm.runInContext(source, context);
 const parse = vm.runInContext("FlightCodeIntelHex.parse", context);
+const transferSizeFromConfiguration = vm.runInContext("FlightCodeDfu.transferSizeFromConfiguration", context);
 
 assert.doesNotMatch(source, /\bconfirm\s*\(/);
 assert.doesNotMatch(source, /navigator\.usb\.getDevices\(\)/);
 assert.match(source, /navigator\.usb\.requestDevice\(\{filters:\[filter\]\}\)/);
 assert.match(source, /resetAfterFlash\(\)/);
+assert.match(source, /setAddress\(address\);await this\.out\(1,2,new Uint8Array\(\)\)/);
 assert.match(source, /FLYWOOF405NANO:\{label:"Flywoo GN405 Nano V3"/);
 assert.match(source, /FLYWOOF405NANO_ANALOG:\{label:"Flywoo GN405 Nano Analog"/);
+assert.match(source, /SEQUREH7V2:\{label:"SEQURE H743 V2",filename:"SEQUREH7V2",kind:"stm32",extension:"\.hex",firmwareEnd:0x081c0000,transferSize:1024,sectors:\[(?:128,){15}128\]\}/);
+assert.match(source, /STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY/);
 assert.match(source, /sort\(\(\[,a\],\[,b\]\)=>b\.filename\.length-a\.filename\.length\)/);
 assert.match(source, /This firmware is for \$\{fileTarget\[1\]\.label\}/);
 assert.match(source, /Expected \$\{expectedFilename\(target\)\}/);
+
+const configurationDescriptor = Uint8Array.from([
+  9, 2, 27, 0, 1, 1, 0, 0x80, 50,
+  9, 4, 0, 0, 0, 0xfe, 1, 2, 4,
+  9, 0x21, 0x0b, 0xff, 0x00, 0x00, 0x04, 0x1a, 0x01,
+]);
+assert.equal(transferSizeFromConfiguration(configurationDescriptor, 0, 0), 1024);
+assert.equal(transferSizeFromConfiguration(configurationDescriptor, 1, 0), 0);
 
 function record(address, type, data) {
   const bytes = [data.length, address >> 8, address & 0xff, type, ...data];

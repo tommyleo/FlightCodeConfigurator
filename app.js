@@ -1,10 +1,10 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.4.0",MINIMUM_FIRMWARE_VERSION="1.4.0";
+const CONFIGURATOR_VERSION="1.5.0",MINIMUM_FIRMWARE_VERSION="1.4.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
 vtxTables.HDZERO={R:[5658,5695,5732,5769,5806,5843,5880,5917],E:[5705,0,0,0,0,0,0,0],F:[5740,5760,0,5800,0,0,0,0],L:[5362,5399,5436,5473,5510,5547,5584,5621]};
-const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",rxBytes:new Uint8Array(0),binaryTransfer:null,heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,gyroRates:[8000],calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",firmwareVersion:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdDigital:false,osdRows:16,osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
+const state={port:null,reader:null,writer:null,task:null,connected:false,closing:false,buffer:"",rxBytes:new Uint8Array(0),binaryTransfer:null,heartbeat:null,helloTimer:null,motorHeartbeat:null,motorTest:false,armed:false,signal:false,telemetrySeen:false,count:0,lastUs:null,loopHz:0,maxLoopPeriodUs:0,gyroRateHz:0,gyroRates:[8000],calibrated:false,attitudeReady:false,gravityReference:[0,0,1],q:[1,0,0,0],angle:{roll:0,pitch:0,yaw:0},board:"",firmwareVersion:"",imuName:"",protocol:0,capabilities:new Set(),serialPorts:["UART1"],receiverProtocols:["SBUS"],receiverProtocolsReported:false,activeReceiverProtocol:"SBUS",activeReceiverPort:"UART1",osdAvailable:false,osdDigital:false,osdRows:16,osdDetectedMode:"PAL",osdDirty:false,blackboxState:"UNSUPPORTED",blackboxDirty:false};
 const osdElements=[
   {label:"Battery voltage",sample:"▤16.80V"},
   {label:"Cell voltage",sample:"▤4.20V"},
@@ -12,7 +12,7 @@ const osdElements=[
   {label:"FlightCode logo",sample:"FLIGHTCODE"},
   {label:"Pilot name",sample:"PILOT"}
   ,{label:"VTX",sample:"F:3:200"},
-  {label:"Current",sample:"45 A"}
+  {label:"Current",sample:"100A"}
 ];
 const osdLayout={mask:1,positions:[31,61,51,340,369,55,85],pilot:"PILOT",selected:0};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
@@ -135,20 +135,20 @@ function validateSerialAssignments(){
   channel.replaceChildren(...frequencies.map((frequency,index)=>new Option(frequency?`CH ${index+1} · ${frequency} MHz`:`CH ${index+1} · unavailable`,index+1)));
   channel.value=frequencies[selectedChannel-1]?selectedChannel:frequencies.findIndex(Boolean)+1;
   [...channel.options].forEach((option,index)=>option.disabled=!frequencies[index]);
-  const power=$("#vtxPower"),selectedPower=Number(power.value),powers=hdzero?[25,200]:[25,100,200,400,500,600,1000];
+  const power=$("#vtxPower"),selectedPower=Number(power.value),powers=hdzero?[25,200]:protocol==="SMARTAUDIO"?[25,100,200,400,500,600,800,1000]:[25,100,200,400,500,600,1000];
   power.replaceChildren(...powers.map(value=>new Option(`${value} mW`,value)));
   power.value=powers.includes(selectedPower)?selectedPower:powers[0];
   buttons.applyReceiver.disabled=!state.connected||!hasCapability("RECEIVER_CONFIG")||receiverPortInvalid;
   buttons.saveReceiver.disabled=buttons.applyReceiver.disabled;
-  const receiverError=receiverPortInvalid?(receiverProtocol==="ELRS"?(flywoo&&receiverPort==="UART5"?"UART5 is reserved for inverted SBUS; use UART4 for ELRS":"ELRS requires UART4 on this board"):`SBUS requires ${flywoo?"UART5":"UART1"} on this board`):"";
+  const receiverError=!state.connected?"":receiverPortInvalid?(receiverProtocol==="ELRS"?(flywoo&&receiverPort==="UART5"?"UART5 is reserved for inverted SBUS; use UART4 for ELRS":"ELRS requires UART4 on this board"):`SBUS requires ${flywoo?"UART5":"UART1"} on this board`):"";
   setValidationError("receiverView",receiverError);
   if(receiverError)$("#receiverConfigState").textContent="Invalid receiver UART";
   else if($("#receiverConfigState").textContent==="Invalid receiver UART")$("#receiverConfigState").textContent="Unsaved changes";
-  const vtxError=invertedSbusPort?`UART5 is reserved for inverted SBUS; ${hdzero?"MSP DisplayPort":"VTX control"} cannot use it`:conflict?`${port} is assigned to ${receiverProtocol}; choose another UART for ${hdzero?"MSP DisplayPort":"VTX control"}`:unsupportedProtocol?"FlightCodePI supports only MSP DisplayPort":unavailable?"Selected UART is unavailable for this VTX mode":"";
+  const vtxError=!state.connected?"":invertedSbusPort?`UART5 is reserved for inverted SBUS; ${hdzero?"MSP DisplayPort":"VTX control"} cannot use it`:conflict?`${port} is assigned to ${receiverProtocol}; choose another UART for ${hdzero?"MSP DisplayPort":"VTX control"}`:unsupportedProtocol?"FlightCodePI supports only MSP DisplayPort":unavailable?"Selected UART is unavailable for this VTX mode":"";
   buttons.applyVtx.disabled=!usable||Boolean(vtxError);
   buttons.saveVtx.disabled=buttons.applyVtx.disabled;
   setValidationError("vtxView",vtxError);
-  $("#vtxConfigState").textContent=vtxError?"Invalid VTX UART or protocol":"Unsaved changes";
+  $("#vtxConfigState").textContent=!state.connected?"Waiting for board settings":vtxError?"Invalid VTX UART or protocol":"Unsaved changes";
   $("#vtxTable").disabled=!usable||hdzero;$("#vtxTable").title=hdzero?"HDZero uses its built-in channel table":"";
   renderVtxTable();
 }
@@ -187,6 +187,8 @@ function setCapabilityControls(selector,name){
 function updateOsdControls(){
   const usable=state.connected&&hasCapability("OSD_LAYOUT");
   $("#osdEnabled").disabled=!usable;
+  $("#osdVideoMode").disabled=!usable||!hasCapability("OSD_VIDEO_MODE")||state.osdDigital;
+  $("#osdVideoModeField").hidden=state.osdDigital;
   document.querySelectorAll("[data-osd-element]").forEach(button=>button.disabled=!usable||(button.dataset.osdElement==="6"&&!hasCapability("BATTERY_CURRENT")));
   $("#osdPilotName").disabled=!usable;
   $("#applyOsdButton").disabled=!usable;
@@ -454,7 +456,7 @@ function showError(message,viewId,source="runtime"){
 }
 function setValidationError(viewId,message){
   const box=document.getElementById(viewId)?.querySelector(".menu-error");
-  if(message)showError(message,viewId,"validation");
+  if(state.connected&&message)showError(message,viewId,"validation");
   else if(box?.dataset.source==="validation")box.remove();
 }
 function boardErrorMessage(parts){
@@ -520,7 +522,7 @@ function connected(value){
   $("#refreshFlightLogButton").disabled=!value;
   if(!value){$("#downloadFlightLogButton").disabled=true;flightLog.downloading=false}
   updateDfuButton();
-  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369,55,55],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
+  if(!value){state.osdAvailable=false;state.osdDirty=false;state.loopHz=0;state.maxLoopPeriodUs=0;state.gyroRateHz=0;$("#loopFrequency").textContent="—";$("#loopMaxPeriod").textContent="—";$("#gyroRateHz").textContent="—";$("#vbatMultiplier").value="1.000";$("#vbatMultiplierState").textContent="Waiting for board settings";$("#osdEnabled").checked=false;$("#osdVideoMode").value="AUTO";state.osdDetectedMode="PAL";setOsdVideoMode("PAL");setOsdLayout(1,[31,61,51,340,369,55,55],"PILOT");$("#osdConfigState").textContent="Waiting for board settings";$("#deviceName").textContent="No device";updateBattery(NaN);resetSbusDiagnostics();badge($("#flightState"),"OFFLINE");badge($("#receiverState"),"NO SIGNAL");saveState("Not connected");Object.assign(blackbox,{flights:[],downloading:false,flight:null,records:[],expectedFlights:0,totalBytes:0,busy:false});renderBlackboxFlights();$("#blackboxStored").textContent="—";$("#blackboxWrittenDetail").textContent="0 B written this power session";$("#blackboxDownloadState").textContent="No download in progress"}
   if(!value){resetMotorTestUi();$("#pidDiagnosticSafety").checked=false}
   if(!value&&imuDiagnostic.running)cancelImuDiagnostic("Check interrupted: board disconnected.");
   if(!value&&stationaryDiagnostic.running)cancelStationaryDiagnostic("Check interrupted: board disconnected.");
@@ -542,7 +544,7 @@ async function enterDfuMode(){
 }
 window.flightCodeConfigurator={
   board:()=>state.board,
-  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","PICO2_W"].includes(state.board),
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","SEQUREH7V2","PICO2_W"].includes(state.board),
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
@@ -976,7 +978,10 @@ function line(value){
   if(p[1]==="OSD_STATUS"){
     const wasAvailable=state.osdAvailable,available=p[2]==="1";state.osdAvailable=available;state.osdDigital=p[5]==="HD";
     if(!state.osdDirty)$("#osdEnabled").checked=p[3]==="1";updateOsdControls();
-    setOsdVideoMode(p[5]||"PAL");
+    state.osdDetectedMode=p[5]||"PAL";
+    if(!state.osdDirty)$("#osdVideoMode").value=["AUTO","PAL","NTSC"][Number(p[10])||0]||"AUTO";
+    const requestedMode=$("#osdVideoMode").value;
+    setOsdVideoMode(state.osdDigital?"HD":requestedMode==="AUTO"?state.osdDetectedMode:requestedMode);
     $("#osdBackendTitle").textContent=state.osdDigital?"VIDEO / MSP DISPLAYPORT":"VIDEO / MAX7456";$("#osdConnectionTitle").textContent=state.osdDigital?"DIGITAL VIDEO LINK":"REMOVE ALL PROPELLERS";$("#osdConnectionHelp").textContent=state.osdDigital?"The selected UART sends MSP DisplayPort at 115200 baud. Use the VTX tab to select HDZero MSP and the UART wired to the digital VTX.":"For reliable detection, power the flight controller from the LiPo first, then connect USB. The MAX7456 may not be powered by USB alone.";
     $("#osdDetectionState").textContent=state.osdDigital?(available?"MSP DISPLAYPORT READY":"MSP DISPLAYPORT OFF"):state.osdAvailable?`DETECTED · ${p[6]||"FONT ?"}`:`NOT DETECTED · OSDM 0x${p[7]||"??"}`;
     $("#osdDetectionState").title=state.osdDigital?"HDZero MSP DisplayPort · 30 × 16 centered canvas":`Video: ${p[5]||"PAL"} · Font: ${p[6]||"unknown"} · OSDM: 0x${p[7]||"??"} · SPI mode: ${p[8]||"?"}`;
@@ -1164,7 +1169,7 @@ function line(value){
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=11){setReceiverConfig({protocol:p[2],port:"UART1",order:p[3],modes:[{fn:"ARM",channel:Number(p[4]),min:Number(p[5]),max:Number(p[6])},{fn:"BEEP",channel:Number(p[7]),min:Number(p[8]),max:Number(p[9])}]},p[10]==="1");return}
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({protocol:"SBUS",order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
   if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
-  if(p[1]==="VTX_STATUS"&&p.length>=3){const labels={APPLIED:"VTX confirmed at startup",NO_RESPONSE:"No response from VTX at startup. This may be normal if the battery is not connected and the VTX is not powered.",RACE_LOCKED:"VTX race lock is enabled",NOT_CONFIRMED:"VTX did not confirm frequency / power",UART_ERROR:"Selected UART is unavailable",INVALID_SETTINGS:"Invalid VTX settings",NOT_CONFIGURED:"VTX control is disabled"};$("#vtxConfigState").textContent=labels[p[2]]||`VTX status: ${p[2]}`;return}
+  if(p[1]==="VTX_STATUS"&&p.length>=3){const labels={APPLIED:"VTX confirmed at startup",NO_RESPONSE:"No response from VTX at startup. This may be normal if the battery is not connected and the VTX is not powered.",RACE_LOCKED:"VTX race lock is enabled",NOT_CONFIRMED:"VTX did not confirm channel / frequency / power",UNSUPPORTED_POWER:"Band/channel confirmed, but this SmartAudio version does not support the selected power",UART_ERROR:"Selected UART is unavailable",INVALID_SETTINGS:"Invalid VTX settings",NOT_CONFIGURED:"VTX control is disabled"};$("#vtxConfigState").textContent=labels[p[2]]||`VTX status: ${p[2]}`;return}
   if(p[1]==="MOTOR_PROTOCOL"){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
     $("#motorProtocol").value=p[2];return;
@@ -1328,9 +1333,11 @@ function osdLayoutCommand(){const pilot=(osdLayout.pilot||"-").replaceAll(" ","_
 function osdCurrentCommand(){return `SET_OSD_CURRENT ${osdLayout.mask&64?1:0} ${osdLayout.positions[6]}`}
 function markOsdDirty(){state.osdDirty=true;$("#osdConfigState").textContent="Local changes"}
 $("#osdEnabled").onchange=markOsdDirty;
+$("#osdVideoMode").onchange=()=>{markOsdDirty();const mode=$("#osdVideoMode").value;setOsdVideoMode(mode==="AUTO"?state.osdDetectedMode:mode)};
+async function applyOsdVideoMode(){if(hasCapability("OSD_VIDEO_MODE")&&!state.osdDigital)await send(`SET_OSD_VIDEO_MODE ${$("#osdVideoMode").value}`)}
 $("#osdPilotName").oninput=event=>{osdLayout.pilot=event.target.value.toUpperCase().replace(/[^A-Z0-9 -]/g,"").slice(0,12);osdLayout.mask|=1<<4;osdLayout.selected=4;markOsdDirty();renderOsdLayout()};
-$("#applyOsdButton").onclick=async()=>{await send(osdCommand());await send(osdLayoutCommand());if(hasCapability("BATTERY_CURRENT"))await send(osdCurrentCommand());state.osdDirty=false;$("#osdConfigState").textContent="Applied · not saved"};
-$("#saveOsdButton").onclick=async()=>{await send(osdCommand());await send(osdLayoutCommand());if(hasCapability("BATTERY_CURRENT"))await send(osdCurrentCommand());await send("SAVE_SETTINGS");state.osdDirty=false;$("#osdConfigState").textContent="Saved to flash"};
+$("#applyOsdButton").onclick=async()=>{await applyOsdVideoMode();await send(osdCommand());await send(osdLayoutCommand());if(hasCapability("BATTERY_CURRENT"))await send(osdCurrentCommand());state.osdDirty=false;$("#osdConfigState").textContent="Applied · not saved"};
+$("#saveOsdButton").onclick=async()=>{await applyOsdVideoMode();await send(osdCommand());await send(osdLayoutCommand());if(hasCapability("BATTERY_CURRENT"))await send(osdCurrentCommand());await send("SAVE_SETTINGS");state.osdDirty=false;$("#osdConfigState").textContent="Saved to flash"};
 function blackboxCommand(){return `SET_BLACKBOX ${$("#blackboxEnabled").checked?1:0}`}
 $("#blackboxEnabled").onchange=()=>{state.blackboxDirty=true;$("#blackboxConfigState").textContent="Local changes"};
 $("#refreshBlackboxButton").onclick=()=>{send("GET_BLACKBOX_STATUS");requestBlackboxCatalog()};

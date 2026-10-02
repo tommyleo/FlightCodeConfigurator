@@ -47,6 +47,26 @@ const FlightCodeIntelHex=(()=>{
 
 if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
 
+const FlightCodeDfu=(()=>{
+  function transferSizeFromConfiguration(bytes,interfaceNumber,alternateSetting){
+    let activeInterface=-1,activeAlternate=-1;
+    for(let offset=0;offset+2<=bytes.length;){
+      const length=bytes[offset],type=bytes[offset+1];
+      if(length<2||offset+length>bytes.length)break;
+      if(type===4&&length>=9){activeInterface=bytes[offset+2];activeAlternate=bytes[offset+3]}
+      else if(type===0x21&&length>=7&&activeInterface===interfaceNumber&&activeAlternate===alternateSetting){
+        const size=bytes[offset+5]|(bytes[offset+6]<<8);
+        if(size>=2&&size<=2048)return size;
+      }
+      offset+=length;
+    }
+    return 0;
+  }
+  return {transferSizeFromConfiguration};
+})();
+
+if(typeof window!=="undefined")window.FlightCodeDfu=FlightCodeDfu;
+
 (()=>{
   if(typeof document==="undefined")return;
   const $=selector=>document.querySelector(selector);
@@ -58,6 +78,7 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
     CLRACINGF4:{label:"CLRacing F4",filename:"CLRACINGF4",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     FLYWOOF405NANO:{label:"Flywoo GN405 Nano V3",filename:"FLYWOOF405NANO",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     FLYWOOF405NANO_ANALOG:{label:"Flywoo GN405 Nano Analog",filename:"FLYWOOF405NANO_ANALOG",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
+    SEQUREH7V2:{label:"SEQURE H743 V2",filename:"SEQUREH7V2",kind:"stm32",extension:".hex",firmwareEnd:0x081c0000,transferSize:1024,sectors:[128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]},
     PICO2_W:{label:"Raspberry Pi Pico 2 W",filename:"FLIGHTCODEPI",kind:"pico",extension:".uf2",firmwareEnd:PICO_RESERVED_START}
   };
   const state={image:null,file:null,fileError:"",detectedBoard:"",device:null,session:null,sessionTarget:"",busy:false};
@@ -80,13 +101,13 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
   function updateModeUi(){
     const target=selectedTarget();
     if(!target){
-      ui.modeLabel.textContent="MAINTENANCE / FIRMWARE";ui.warning.className="firmware-warning";ui.warningTitle.textContent="SELECT A FLIGHT CONTROLLER";ui.warningText.textContent="The configurator selects the correct flashing protocol from the connected board.";ui.fileTypeLabel.textContent="LOCAL FIRMWARE";ui.file.accept=".hex,.uf2,text/plain,application/octet-stream";ui.step1Title.textContent="Enter bootloader";ui.step1Text.textContent="Use the connected board or its BOOT button.";ui.step2Title.textContent="Connect bootloader";ui.step2Text.textContent="Authorize the bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application memory, write, and compare every byte.";ui.enter.textContent="Restart in bootloader";ui.connect.textContent="Connect bootloader";
+      ui.modeLabel.textContent="MAINTENANCE / FIRMWARE";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY";ui.warningText.textContent="The configurator selects the correct flashing protocol from the connected board.";ui.fileTypeLabel.textContent="LOCAL FIRMWARE";ui.file.accept=".hex,.uf2,text/plain,application/octet-stream";ui.step1Title.textContent="Enter bootloader";ui.step1Text.textContent="Use the connected board or its BOOT button.";ui.step2Title.textContent="Connect bootloader";ui.step2Text.textContent="Authorize the bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application memory, write, and compare every byte.";ui.enter.textContent="Restart in bootloader";ui.connect.textContent="Connect bootloader";
       return;
     }
     if(target.kind==="pico"){
-      ui.modeLabel.textContent="MAINTENANCE / RP2350 PICOBOOT";ui.warning.className="firmware-warning pico";ui.warningTitle.textContent="RASPBERRY PI PICO 2 W ONLY";ui.warningText.textContent="Use a FlightCodePI UF2 built for RP2350 ARM. BOOTSEL is stored in ROM, so the board can always be recovered with its BOOTSEL button.";ui.fileTypeLabel.textContent="LOCAL UF2 FIRMWARE";ui.file.accept=".uf2,application/octet-stream";ui.step1Title.textContent="Enter BOOTSEL";ui.step1Text.textContent="Restart the connected Pico or hold BOOTSEL while plugging in USB.";ui.step2Title.textContent="Connect Picoboot";ui.step2Text.textContent="Authorize the Raspberry Pi RP2350 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase only application flash, write the UF2 payload, and compare every byte.";ui.enter.textContent="Restart in BOOTSEL";ui.connect.textContent="Connect BOOTSEL";
+      ui.modeLabel.textContent="MAINTENANCE / RP2350 PICOBOOT";ui.warning.className="firmware-warning pico";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY";ui.warningText.textContent="Use a FlightCodePI UF2 built for RP2350 ARM. BOOTSEL is stored in ROM, so the board can always be recovered with its BOOTSEL button.";ui.fileTypeLabel.textContent="LOCAL UF2 FIRMWARE";ui.file.accept=".uf2,application/octet-stream";ui.step1Title.textContent="Enter BOOTSEL";ui.step1Text.textContent="Restart the connected Pico or hold BOOTSEL while plugging in USB.";ui.step2Title.textContent="Connect Picoboot";ui.step2Text.textContent="Authorize the Raspberry Pi RP2350 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase only application flash, write the UF2 payload, and compare every byte.";ui.enter.textContent="Restart in BOOTSEL";ui.connect.textContent="Connect BOOTSEL";
     }else{
-      ui.modeLabel.textContent="MAINTENANCE / STM32 DFU";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS ONLY";ui.warningText.textContent="Use a FlightCode HEX built specifically for the selected board. Keep the LiPo disconnected and do not unplug USB while erasing, writing, or verifying.";ui.fileTypeLabel.textContent="LOCAL HEX FIRMWARE";ui.file.accept=".hex,text/plain";ui.step1Title.textContent="Enter DFU";ui.step1Text.textContent="Restart the connected board or use its BOOT button.";ui.step2Title.textContent="Connect DFU";ui.step2Text.textContent="Authorize the STM32 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application sectors, write, and compare every byte.";ui.enter.textContent="Restart in DFU";ui.connect.textContent="Connect DFU";
+      ui.modeLabel.textContent="MAINTENANCE / STM32 DFU";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY";ui.warningText.textContent="Use a FlightCode HEX built specifically for the selected board. Keep the LiPo disconnected and do not unplug USB while erasing, writing, or verifying.";ui.fileTypeLabel.textContent="LOCAL HEX FIRMWARE";ui.file.accept=".hex,text/plain";ui.step1Title.textContent="Enter DFU";ui.step1Text.textContent="Restart the connected board or use its BOOT button.";ui.step2Title.textContent="Connect DFU";ui.step2Text.textContent="Authorize the STM32 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application sectors, write, and compare every byte.";ui.enter.textContent="Restart in DFU";ui.connect.textContent="Connect DFU";
     }
   }
 
@@ -147,7 +168,7 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
   function sectorsForImage(target,image){return sectorsForTarget(target).filter(sector=>image.segments.some(segment=>segment.address<sector.address+sector.size&&segment.address+segment.data.length>sector.address))}
 
   class Stm32DfuSession{
-    constructor(device){this.device=device;this.interfaceNumber=0;this.alternateSetting=0;this.transferSize=2048;this.memoryName="Internal Flash";this.kind="stm32"}
+    constructor(device,fallbackTransferSize=2048){this.device=device;this.interfaceNumber=0;this.alternateSetting=0;this.transferSize=fallbackTransferSize;this.memoryName="Internal Flash";this.kind="stm32"}
     setup(request){return {requestType:"class",recipient:"interface",request,value:0,index:this.interfaceNumber}}
     async out(request,value,data=new Uint8Array()){const result=await this.device.controlTransferOut({...this.setup(request),value},data);if(result.status!=="ok")throw new Error(`DFU OUT request ${request} failed: ${result.status}`);return result}
     async input(request,value,length){const result=await this.device.controlTransferIn({...this.setup(request),value},length);if(result.status!=="ok"||!result.data)throw new Error(`DFU IN request ${request} failed: ${result.status}`);return new Uint8Array(result.data.buffer,result.data.byteOffset,result.data.byteLength)}
@@ -156,7 +177,20 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
       let selected=null;
       for(const iface of this.device.configuration.interfaces){for(const alternate of iface.alternates){if(alternate.interfaceClass===0xfe&&alternate.interfaceSubclass===1){const candidate={iface:iface.interfaceNumber,alternate:alternate.alternateSetting,name:alternate.interfaceName||"DFU flash"};if(!selected||/internal flash/i.test(candidate.name))selected=candidate}}}
       if(!selected)throw new Error("The selected USB device has no DFU interface");
-      this.interfaceNumber=selected.iface;this.alternateSetting=selected.alternate;this.memoryName=selected.name;await this.device.claimInterface(this.interfaceNumber);await this.device.selectAlternateInterface(this.interfaceNumber,this.alternateSetting);await this.ensureIdle();
+      this.interfaceNumber=selected.iface;this.alternateSetting=selected.alternate;this.memoryName=selected.name;await this.detectTransferSize();await this.device.claimInterface(this.interfaceNumber);await this.device.selectAlternateInterface(this.interfaceNumber,this.alternateSetting);await this.ensureIdle();
+    }
+    async detectTransferSize(){
+      try{
+        const configurations=this.device.configurations||[],selectedValue=this.device.configuration.configurationValue;
+        const descriptorIndex=Math.max(0,configurations.findIndex(configuration=>configuration.configurationValue===selectedValue));
+        const setup={requestType:"standard",recipient:"device",request:6,value:(2<<8)|descriptorIndex,index:0};
+        const header=await this.device.controlTransferIn(setup,9);
+        if(header.status!=="ok"||!header.data||header.data.byteLength<4)return;
+        const totalLength=header.data.getUint16(2,true),full=await this.device.controlTransferIn(setup,totalLength);
+        if(full.status!=="ok"||!full.data)return;
+        const bytes=new Uint8Array(full.data.buffer,full.data.byteOffset,full.data.byteLength);
+        this.transferSize=FlightCodeDfu.transferSizeFromConfiguration(bytes,this.interfaceNumber,this.alternateSetting)||this.transferSize;
+      }catch{}
     }
     async getStatus(){const data=await this.input(3,0,6);return {status:data[0],pollTimeout:data[1]|(data[2]<<8)|(data[3]<<16),state:data[4]}}
     async clearStatus(){await this.out(4,0)}
@@ -167,7 +201,17 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
     async erasePage(address){const command=new Uint8Array(5);command[0]=0x41;new DataView(command.buffer).setUint32(1,address,true);await this.out(1,0,command);await this.waitDownload()}
     async writeSegment(segment,onBytes){await this.setAddress(segment.address);let offset=0,block=2;while(offset<segment.data.length){const chunk=segment.data.slice(offset,offset+this.transferSize);await this.out(1,block++,chunk);await this.waitDownload();offset+=chunk.length;onBytes(chunk.length)}}
     async verifySegment(segment,onBytes){await this.ensureIdle();await this.setAddress(segment.address);await this.abort();let offset=0,block=2;while(offset<segment.data.length){const length=Math.min(this.transferSize,segment.data.length-offset),actual=await this.input(2,block++,length);if(actual.length!==length)throw new Error(`Verify read returned ${actual.length} bytes instead of ${length}`);for(let i=0;i<length;i++)if(actual[i]!==segment.data[offset+i])throw new Error(`Verification failed at ${hex(segment.address+offset+i)}`);offset+=length;onBytes(length)}await this.abort()}
-    async leave(address){await this.ensureIdle();await this.setAddress(address);await this.out(1,0,new Uint8Array());try{await this.getStatus()}catch{}}
+    async leave(address){
+      // DfuSe reserves block 0 for commands and block 1.  The zero-length
+      // download that manifests (starts) the application must use block 2.
+      await this.ensureIdle();await this.setAddress(address);await this.out(1,2,new Uint8Array());
+      for(let attempt=0;attempt<8;attempt++){
+        let status;try{status=await this.getStatus()}catch{return}
+        if(status.state===8){try{await this.device.reset()}catch{}return}
+        await new Promise(resolve=>setTimeout(resolve,Math.max(1,status.pollTimeout)));
+      }
+      try{await this.device.reset()}catch{}
+    }
     async close(){try{if(this.device.opened)await this.device.releaseInterface(this.interfaceNumber)}catch{}try{if(this.device.opened)await this.device.close()}catch{}}
   }
 
@@ -197,9 +241,9 @@ if(typeof window!=="undefined")window.FlightCodeIntelHex=FlightCodeIntelHex;
       await discardSession();
       const filter=target.kind==="pico"?{vendorId:0x2e8a,productId:0x000f}:{vendorId:0x0483,productId:0xdf11};
       state.device=await navigator.usb.requestDevice({filters:[filter]});
-      state.session=target.kind==="pico"?new Rp2350PicobootSession(state.device):new Stm32DfuSession(state.device);
+      state.session=target.kind==="pico"?new Rp2350PicobootSession(state.device):new Stm32DfuSession(state.device,target.transferSize||2048);
       await state.session.open();state.sessionTarget=ui.target.value;
-      const name=target.kind==="pico"?(state.device.productName||"Raspberry Pi RP2350"):`${state.device.productName||"STM32 Bootloader"} · ${state.session.memoryName}`;
+      const name=target.kind==="pico"?(state.device.productName||"Raspberry Pi RP2350"):`${state.device.productName||"STM32 Bootloader"} · ${state.session.memoryName} · ${state.session.transferSize}-byte transfers`;
       badge(target.kind==="pico"?"BOOTSEL CONNECTED":"DFU CONNECTED","online");progress(0,"Bootloader ready");log(`Connected: ${name}`);
     }catch(error){await discardSession();badge("NOT CONNECTED");progress(0,"Bootloader connection failed");log(error.name==="NotFoundError"?"Bootloader selection cancelled":`Bootloader connection failed: ${error.message}`)}
     finally{setBusy(false)}

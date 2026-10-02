@@ -1,6 +1,6 @@
 # FlightCode Configurator
 
-Current release: **1.4.0**.
+Current release: **1.5.0**.
 
 ## FlightCode in action! 🚀
 
@@ -154,7 +154,7 @@ flash address so storage faults can be diagnosed without flying.
 The **Firmware** tab detects the connected board and selects its matching
 bootloader and firmware format:
 
-- MAMBAF411, CLRACINGF4, FLYWOOF405NANO, and FLYWOOF405NANO_ANALOG use STM32 DFU with a matching
+- MAMBAF411, CLRACINGF4, FLYWOOF405NANO, FLYWOOF405NANO_ANALOG, and SEQUREH7V2 use STM32 DFU with a matching
   FlightCode `.hex` file.
 - Raspberry Pi Pico 2 W uses RP2350 Picoboot with a FlightCodePI `.uf2` file.
 

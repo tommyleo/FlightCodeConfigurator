@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
-  <title>FlightCode Configurator 1.4.0</title>
+  <title>FlightCode Configurator 1.5.0</title>
   <link rel="stylesheet" href="styles.css?v=20260903-1">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
@@ -14,7 +14,7 @@
   <header class="topbar">
     <div class="brand">
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
-      <div><b>FlightCode</b><small>CONFIGURATOR · v1.4.0</small></div>
+      <div><b>FlightCode</b><small>CONFIGURATOR · v1.5.0</small></div>
     </div>
     <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
@@ -240,6 +240,7 @@
         </article>
         <article class="card osd-card">
           <header>OSD LAYOUT <small id="osdGridFormat">PAL · 30 × 16 GRID</small></header>
+          <label class="osd-pilot-field" id="osdVideoModeField">Video format<select id="osdVideoMode" disabled><option value="AUTO">Auto</option><option value="PAL">PAL</option><option value="NTSC">NTSC</option></select><small>Match the camera format. PAL / NTSC is saved and used from power-on.</small></label>
           <div class="osd-enable-row"><div><b>Enable OSD overlay</b><small>Choose the visible elements and drag them directly over the video preview.</small></div><label class="osd-switch"><input id="osdEnabled" type="checkbox" disabled><span></span></label></div>
           <div class="osd-layout-editor">
             <div id="osdPalette" class="osd-palette" aria-label="OSD elements">
@@ -250,7 +251,7 @@
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="3"><span><b>FlightCode logo</b><small>FLIGHTCODE</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="4"><span><b>Pilot name</b><small id="osdPilotPreview">PILOT</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="5"><span><b>VTX</b><small>F:3:200</small></span><i aria-hidden="true"></i></button>
-              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="6"><span><b>Current</b><small>45 A</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="6"><span><b>Current</b><small>100A</small></span><i aria-hidden="true"></i></button>
               <label class="osd-pilot-field"><span>Pilot name</span><input id="osdPilotName" maxlength="12" placeholder="PILOT" autocomplete="off" disabled></label>
             </div>
             <div class="osd-preview-wrap">
@@ -359,12 +360,12 @@
       <section id="firmwareView" class="view">
         <header class="heading"><div><small id="firmwareModeLabel">MAINTENANCE / FIRMWARE</small><h1>Firmware flasher</h1></div><b id="firmwareDfuState" class="badge">WAITING</b></header>
         <article id="firmwareWarning" class="firmware-warning">
-          <strong id="firmwareWarningTitle">SELECT A FLIGHT CONTROLLER</strong>
+          <strong id="firmwareWarningTitle">STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY</strong>
           <p id="firmwareWarningText">The configurator selects the correct flashing protocol from the connected board.</p>
         </article>
         <article class="firmware-card">
           <div class="firmware-fields">
-            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="FLYWOOF405NANO_ANALOG">Flywoo GN405 Nano Analog</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
+            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="FLYWOOF405NANO_ANALOG">Flywoo GN405 Nano Analog</option><option value="SEQUREH7V2">SEQURE H743 V2</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
             <label><small id="firmwareFileTypeLabel">LOCAL FIRMWARE</small><input id="firmwareFile" type="file" accept=".hex,.uf2,text/plain,application/octet-stream"></label>
           </div>
           <div class="firmware-file-info">
