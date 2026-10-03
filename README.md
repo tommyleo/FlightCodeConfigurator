@@ -1,21 +1,21 @@
 # FlightCode Configurator
 
-Current release: **1.5.0**.
+Current release: **1.5.1**.
 
 ## FlightCode in action! 🚀
 
 **[Watch the flight video on YouTube](https://youtu.be/JjHND97abkM)**
 
-Shared Web Serial configurator for FlightCode firmware on STM32F4 and
+Shared Web Serial configurator for FlightCode firmware on STM32F4/H7, AT32F435 and
 FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
 available features and adapts the interface to the connected board.
 
 ## Firmware projects
 
 - **[FlightCode](https://github.com/tommyleo/FlightCode)** — firmware for
-  supported STM32 flight controllers, including analog and HD targets,
+  supported STM32 and AT32 flight controllers, including analog and HD targets,
   microSD or internal-flash Blackbox where available, OSD, receiver setup,
-  diagnostics, and STM32 DFU flashing.
+  diagnostics, and STM32 / AT32 DFU flashing.
 - **[FlightCodePI](https://github.com/tommyleo/FlightCodePI)** — firmware for
   Raspberry Pi Pico 2 and Pico 2 W boards, with SBUS, DSHOT, configurable flight
   control, protected diagnostics, onboard flight logs, and RP2350 UF2 flashing.
@@ -168,3 +168,20 @@ The configurator validates the HEX or UF2 target and address range, erases only
 application memory, verifies every programmed byte, and then restarts the
 flight controller. Reserved settings and flight-log storage are preserved. On
 success, the Firmware tab is reset for the next operation.
+
+## Hummingbird 200 RaceSpec (development target)
+
+Select `HUMMINGBIRD_200RS` to use its matching FlightCode HEX. The native
+AT32F435 port has not yet been bench tested. The Configurator recognizes
+firmware CDC `2E3C:5740` and ROM DFU `2E3C:DF11`, reserves UART1 for the integrated
+CRSF/ELRS receiver, and offers UART5/UART7 for VTX. Flashing erases only occupied
+application pages and verifies their contents; the final 2 KiB settings page
+is excluded. AT32 DFU requires WebUSB and a suitable USB driver on Windows.
+Android supports normal CDC configuration; browser DFU remains a WebUSB feature.
+
+The top-right status bar shows **Current draw** beside voltage with two decimal places on
+boards reporting `BATTERY_CURRENT`. A missing sensor or disconnected board shows
+`— A`. This value is instantaneous amperage, not consumed capacity in mAh.
+
+On SEQURE H7 with diagnostic firmware, hover over current to see sensor voltage,
+sample count, sample age and conversion errors. Stale ADC samples show — A.

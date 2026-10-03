@@ -16,7 +16,7 @@ assert.match(source, /setAddress\(address\);await this\.out\(1,2,new Uint8Array\
 assert.match(source, /FLYWOOF405NANO:\{label:"Flywoo GN405 Nano V3"/);
 assert.match(source, /FLYWOOF405NANO_ANALOG:\{label:"Flywoo GN405 Nano Analog"/);
 assert.match(source, /SEQUREH7V2:\{label:"SEQURE H743 V2",filename:"SEQUREH7V2",kind:"stm32",extension:"\.hex",firmwareEnd:0x081c0000,transferSize:1024,sectors:\[(?:128,){15}128\]\}/);
-assert.match(source, /STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY/);
+assert.match(source, /STM32 \/ AT32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO/);
 assert.match(source, /sort\(\(\[,a\],\[,b\]\)=>b\.filename\.length-a\.filename\.length\)/);
 assert.match(source, /This firmware is for \$\{fileTarget\[1\]\.label\}/);
 assert.match(source, /Expected \$\{expectedFilename\(target\)\}/);

@@ -1,5 +1,5 @@
 const FlightCodeWebUsbSerial=(()=>{
-  const DEVICE_FILTERS=[{vendorId:0x0483,productId:0x5740}];
+  const DEVICE_FILTERS=[{vendorId:0x0483,productId:0x5740},{vendorId:0x2e3c,productId:0x5740}];
 
   function isAndroid(userAgent=globalThis.navigator?.userAgent||""){
     return /Android/i.test(userAgent);

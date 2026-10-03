@@ -79,6 +79,7 @@ if(typeof window!=="undefined")window.FlightCodeDfu=FlightCodeDfu;
     FLYWOOF405NANO:{label:"Flywoo GN405 Nano V3",filename:"FLYWOOF405NANO",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     FLYWOOF405NANO_ANALOG:{label:"Flywoo GN405 Nano Analog",filename:"FLYWOOF405NANO_ANALOG",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     SEQUREH7V2:{label:"SEQURE H743 V2",filename:"SEQUREH7V2",kind:"stm32",extension:".hex",firmwareEnd:0x081c0000,transferSize:1024,sectors:[128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]},
+    HUMMINGBIRD_200RS:{label:"NewBeeDrone Hummingbird 200 RaceSpec",filename:"HUMMINGBIRD_200RS",kind:"at32",extension:".hex",firmwareEnd:0x080ff800,transferSize:2048,sectors:Array(512).fill(2),usbFilter:{vendorId:0x2e3c,productId:0xdf11}},
     PICO2_W:{label:"Raspberry Pi Pico 2 W",filename:"FLIGHTCODEPI",kind:"pico",extension:".uf2",firmwareEnd:PICO_RESERVED_START}
   };
   const state={image:null,file:null,fileError:"",detectedBoard:"",device:null,session:null,sessionTarget:"",busy:false};
@@ -101,16 +102,23 @@ if(typeof window!=="undefined")window.FlightCodeDfu=FlightCodeDfu;
   function updateModeUi(){
     const target=selectedTarget();
     if(!target){
-      ui.modeLabel.textContent="MAINTENANCE / FIRMWARE";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY";ui.warningText.textContent="The configurator selects the correct flashing protocol from the connected board.";ui.fileTypeLabel.textContent="LOCAL FIRMWARE";ui.file.accept=".hex,.uf2,text/plain,application/octet-stream";ui.step1Title.textContent="Enter bootloader";ui.step1Text.textContent="Use the connected board or its BOOT button.";ui.step2Title.textContent="Connect bootloader";ui.step2Text.textContent="Authorize the bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application memory, write, and compare every byte.";ui.enter.textContent="Restart in bootloader";ui.connect.textContent="Connect bootloader";
+      ui.modeLabel.textContent="MAINTENANCE / FIRMWARE";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 / AT32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO";ui.warningText.textContent="The configurator selects the correct flashing protocol from the connected board.";ui.fileTypeLabel.textContent="LOCAL FIRMWARE";ui.file.accept=".hex,.uf2,text/plain,application/octet-stream";ui.step1Title.textContent="Enter bootloader";ui.step1Text.textContent="Use the connected board or its BOOT button.";ui.step2Title.textContent="Connect bootloader";ui.step2Text.textContent="Authorize the bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application memory, write, and compare every byte.";ui.enter.textContent="Restart in bootloader";ui.connect.textContent="Connect bootloader";
       return;
     }
     if(target.kind==="pico"){
-      ui.modeLabel.textContent="MAINTENANCE / RP2350 PICOBOOT";ui.warning.className="firmware-warning pico";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY";ui.warningText.textContent="Use a FlightCodePI UF2 built for RP2350 ARM. BOOTSEL is stored in ROM, so the board can always be recovered with its BOOTSEL button.";ui.fileTypeLabel.textContent="LOCAL UF2 FIRMWARE";ui.file.accept=".uf2,application/octet-stream";ui.step1Title.textContent="Enter BOOTSEL";ui.step1Text.textContent="Restart the connected Pico or hold BOOTSEL while plugging in USB.";ui.step2Title.textContent="Connect Picoboot";ui.step2Text.textContent="Authorize the Raspberry Pi RP2350 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase only application flash, write the UF2 payload, and compare every byte.";ui.enter.textContent="Restart in BOOTSEL";ui.connect.textContent="Connect BOOTSEL";
+      ui.modeLabel.textContent="MAINTENANCE / RP2350 PICOBOOT";ui.warning.className="firmware-warning pico";ui.warningTitle.textContent="STM32 / AT32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO";ui.warningText.textContent="Use a FlightCodePI UF2 built for RP2350 ARM. BOOTSEL is stored in ROM, so the board can always be recovered with its BOOTSEL button.";ui.fileTypeLabel.textContent="LOCAL UF2 FIRMWARE";ui.file.accept=".uf2,application/octet-stream";ui.step1Title.textContent="Enter BOOTSEL";ui.step1Text.textContent="Restart the connected Pico or hold BOOTSEL while plugging in USB.";ui.step2Title.textContent="Connect Picoboot";ui.step2Text.textContent="Authorize the Raspberry Pi RP2350 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase only application flash, write the UF2 payload, and compare every byte.";ui.enter.textContent="Restart in BOOTSEL";ui.connect.textContent="Connect BOOTSEL";
     }else{
-      ui.modeLabel.textContent="MAINTENANCE / STM32 DFU";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY";ui.warningText.textContent="Use a FlightCode HEX built specifically for the selected board. Keep the LiPo disconnected and do not unplug USB while erasing, writing, or verifying.";ui.fileTypeLabel.textContent="LOCAL HEX FIRMWARE";ui.file.accept=".hex,text/plain";ui.step1Title.textContent="Enter DFU";ui.step1Text.textContent="Restart the connected board or use its BOOT button.";ui.step2Title.textContent="Connect DFU";ui.step2Text.textContent="Authorize the STM32 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application sectors, write, and compare every byte.";ui.enter.textContent="Restart in DFU";ui.connect.textContent="Connect DFU";
+      ui.modeLabel.textContent="MAINTENANCE / STM32 DFU";ui.warning.className="firmware-warning";ui.warningTitle.textContent="STM32 / AT32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO";ui.warningText.textContent="Use a FlightCode HEX built specifically for the selected board. Keep the LiPo disconnected and do not unplug USB while erasing, writing, or verifying.";ui.fileTypeLabel.textContent="LOCAL HEX FIRMWARE";ui.file.accept=".hex,text/plain";ui.step1Title.textContent="Enter DFU";ui.step1Text.textContent="Restart the connected board or use its BOOT button.";ui.step2Title.textContent="Connect DFU";ui.step2Text.textContent="Authorize the STM32 bootloader through USB.";ui.step3Title.textContent="Flash and verify";ui.step3Text.textContent="Erase application sectors, write, and compare every byte.";ui.enter.textContent="Restart in DFU";ui.connect.textContent="Connect DFU";
+    }
+    if(target.kind==="at32"){
+      ui.modeLabel.textContent="MAINTENANCE / AT32 DFU";
+      ui.warningTitle.textContent="HUMMINGBIRD 200 RACESPEC · DEVELOPMENT FIRMWARE";
+      ui.warningText.textContent="This port awaits testing on a physical board. Use its matching FlightCode HEX. Keep the LiPo disconnected while flashing.";
+      ui.step2Title.textContent="Connect AT32 DFU";ui.step2Text.textContent="Authorize the Artery bootloader through USB.";
+      ui.step3Text.textContent="Write application memory and verify every byte. Saved settings are preserved.";
+      ui.connect.textContent="Connect AT32 DFU";
     }
   }
-
   function setBusy(value){state.busy=value;ui.target.disabled=value;ui.file.disabled=value;ui.enter.disabled=value;ui.connect.disabled=value;updateReady()}
 
   function validateImage(){
@@ -236,14 +244,14 @@ if(typeof window!=="undefined")window.FlightCodeDfu=FlightCodeDfu;
     const target=selectedTarget();
     if(!target){log("Select a flight controller first.");return}
     if(!("usb" in navigator)){log("WebUSB is not available. Use Chrome or Edge on localhost.");return}
-    setBusy(true);progress(0,`Waiting for ${target.kind==="pico"?"RP2350 BOOTSEL":"STM32 DFU"} device…`);
+    setBusy(true);progress(0,`Waiting for ${target.kind==="pico"?"RP2350 BOOTSEL":target.kind==="at32"?"AT32 DFU":"STM32 DFU"} device…`);
     try{
       await discardSession();
-      const filter=target.kind==="pico"?{vendorId:0x2e8a,productId:0x000f}:{vendorId:0x0483,productId:0xdf11};
+      const filter=target.usbFilter||(target.kind==="pico"?{vendorId:0x2e8a,productId:0x000f}:{vendorId:0x0483,productId:0xdf11});
       state.device=await navigator.usb.requestDevice({filters:[filter]});
       state.session=target.kind==="pico"?new Rp2350PicobootSession(state.device):new Stm32DfuSession(state.device,target.transferSize||2048);
       await state.session.open();state.sessionTarget=ui.target.value;
-      const name=target.kind==="pico"?(state.device.productName||"Raspberry Pi RP2350"):`${state.device.productName||"STM32 Bootloader"} · ${state.session.memoryName} · ${state.session.transferSize}-byte transfers`;
+      const name=target.kind==="pico"?(state.device.productName||"Raspberry Pi RP2350"):`${state.device.productName||(target.kind==="at32"?"AT32 Bootloader":"STM32 Bootloader")} · ${state.session.memoryName} · ${state.session.transferSize}-byte transfers`;
       badge(target.kind==="pico"?"BOOTSEL CONNECTED":"DFU CONNECTED","online");progress(0,"Bootloader ready");log(`Connected: ${name}`);
     }catch(error){await discardSession();badge("NOT CONNECTED");progress(0,"Bootloader connection failed");log(error.name==="NotFoundError"?"Bootloader selection cancelled":`Bootloader connection failed: ${error.message}`)}
     finally{setBusy(false)}

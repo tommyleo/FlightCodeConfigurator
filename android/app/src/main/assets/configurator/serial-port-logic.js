@@ -1,5 +1,5 @@
 const FlightCodeSerialPortLogic=(()=>{
-  const flightCodeIds=[{usbVendorId:0x0483,usbProductId:0x5740}];
+  const flightCodeIds=[{usbVendorId:0x0483,usbProductId:0x5740},{usbVendorId:0x2e3c,usbProductId:0x5740}];
   const raspberryIds=[
     {usbVendorId:0x2e8a,usbProductId:0x0009},
     {usbVendorId:0x2e8a,usbProductId:0x000a}

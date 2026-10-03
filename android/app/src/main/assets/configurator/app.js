@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.5.0",MINIMUM_FIRMWARE_VERSION="1.4.0";
+const CONFIGURATOR_VERSION="1.5.1",MINIMUM_FIRMWARE_VERSION="1.4.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -12,9 +12,9 @@ const osdElements=[
   {label:"FlightCode logo",sample:"FLIGHTCODE"},
   {label:"Pilot name",sample:"PILOT"}
   ,{label:"VTX",sample:"F:3:200"},
-  {label:"Current",sample:"100A"}
+  {label:"Current",sample:"999.9A"}
 ];
-const osdLayout={mask:1,positions:[31,61,51,340,369,55,85],pilot:"PILOT",selected:0};
+const osdLayout={mask:1,positions:[31,61,51,340,369,55,84],pilot:"PILOT",selected:0};
 const imuDiagnostic={running:false,stage:0,stageStarted:0,samples:[],file:null,timer:null,stages:[
   {key:"plane_start",axis:"still",target:[0,0,0],ms:3000,text:"Place the quad still and perfectly level"},
   {key:"roll_p90",axis:"roll",target:[90,0,0],ms:4000,text:"Slowly roll to +90° (right side down) and hold"},
@@ -63,7 +63,7 @@ const $=s=>document.querySelector(s);
 axes.forEach(([key,label],axis)=>{
   const card=document.createElement("article");card.className="axis-card";
   card.innerHTML=`<header><b>${label}</b><small>ASSE 0${axis+1}</small></header><div class="axis-fields">${
-    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="${term==="D"?5000:2000}" step="1" value="0" disabled></div>`).join("")
+    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="${term==="D"?5000:2000}" step="1" value="" placeholder="Read pending" disabled></div>`).join("")
   }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1000" step="1" value="0" disabled></div></div>`;
   $("#pidGrid").append(card);
 });
@@ -116,7 +116,7 @@ function getReceiverConfig(){
 }
 function updateReceiverProtocolUi(){const protocol=$("#receiverProtocol").value;$("#receiverInputType").textContent=`INPUT / ${protocol}`;$("#receiverDiagnosticsType").textContent=`${protocol} DIAGNOSTICS`;$("#sbusDiagnosticMessage").textContent=`Waiting for ${protocol} receiver diagnostics…`}
 function setReceiverProtocols(protocols,reported=true){state.receiverProtocols=protocols.length?protocols:["SBUS"];state.receiverProtocolsReported=reported;const select=$("#receiverProtocol"),selected=state.receiverProtocols.includes(receiverConfig.protocol)?receiverConfig.protocol:state.receiverProtocols[0];select.replaceChildren(...state.receiverProtocols.map(protocol=>new Option(protocol==="ELRS"?"ELRS (CRSF)":protocol,protocol)));select.value=selected;receiverConfig.protocol=selected;updateReceiverProtocolUi()}
-function setSerialPorts(ports){state.serialPorts=ports.length?ports:["UART1"];[$("#receiverSerialPort"),$("#vtxSerialPort")].forEach(select=>{const selected=select.value,available=state.board==="PICO2_W"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="PIO0":port==="UART1"):select.id==="vtxSerialPort"&&state.board==="SEQUREH7V2"?state.serialPorts.filter(port=>port!=="UART8"):state.serialPorts;select.replaceChildren(...available.map(port=>new Option(port,port)));select.value=available.includes(selected)?selected:available[0]});receiverConfig.port=$("#receiverSerialPort").value;vtxConfig.port=$("#vtxSerialPort").value;validateSerialAssignments()}
+function setSerialPorts(ports){state.serialPorts=ports.length?ports:["UART1"];[$("#receiverSerialPort"),$("#vtxSerialPort")].forEach(select=>{const selected=select.value,available=state.board==="PICO2_W"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="PIO0":port==="UART1"):state.board==="HUMMINGBIRD_200RS"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="UART1":port!=="UART1"):select.id==="vtxSerialPort"&&state.board==="SEQUREH7V2"?state.serialPorts.filter(port=>port!=="UART8"):state.serialPorts;select.replaceChildren(...available.map(port=>new Option(port,port)));select.value=available.includes(selected)?selected:available[0]});receiverConfig.port=$("#receiverSerialPort").value;vtxConfig.port=$("#vtxSerialPort").value;validateSerialAssignments()}
 function validateSerialAssignments(){
   const port=$("#vtxSerialPort").value,protocol=$("#vtxProtocol").value;
   const receiverPort=$("#receiverSerialPort").value,receiverProtocol=$("#receiverProtocol").value;
@@ -124,7 +124,7 @@ function validateSerialAssignments(){
   const flywoo=state.board==="FLYWOOF405NANO"||state.board==="FLYWOOF405NANO_ANALOG";
   const invertedSbusPort=flywoo&&protocol!=="OFF"&&port==="UART5";
   const receiverPortInvalid=(flywoo||state.board==="CLRACINGF4")&&(receiverProtocol==="ELRS"?receiverPort!=="UART4":receiverPort!==(flywoo?"UART5":"UART1"));
-  const supported={MAMBAF411:["UART1","UART2"],CLRACINGF4:["UART1","UART3","UART4","UART6"],FLYWOOF405NANO:["UART4","UART6"],FLYWOOF405NANO_ANALOG:["UART4","UART6"],HDZERO_HALO:protocol==="HDZERO_MSP"?["UART1","UART2","UART4","UART5"]:["UART1","UART2","UART4"],SEQUREH7V2:["UART1","UART2","UART4","UART6","UART7"],PICO2_W:["UART1"]};
+  const supported={MAMBAF411:["UART1","UART2"],CLRACINGF4:["UART1","UART3","UART4","UART6"],FLYWOOF405NANO:["UART4","UART6"],FLYWOOF405NANO_ANALOG:["UART4","UART6"],HDZERO_HALO:protocol==="HDZERO_MSP"?["UART1","UART2","UART4","UART5"]:["UART1","UART2","UART4"],SEQUREH7V2:["UART1","UART2","UART4","UART6","UART7"],HUMMINGBIRD_200RS:["UART5","UART7"],PICO2_W:["UART1"]};
   const unavailable=protocol!=="OFF"&&!(supported[state.board]||[]).includes(port);
   const unsupportedProtocol=state.board==="PICO2_W"&&protocol!=="OFF"&&protocol!=="HDZERO_MSP";
   const usable=state.connected&&hasCapability("VTX_CONFIG"),hdzero=protocol==="HDZERO_MSP";
@@ -176,7 +176,7 @@ function updateSbusDiagnostics(valid,age,frames,errors,recoveries,overruns,inval
   $("#sbusRecoveries").textContent=recoveries.toLocaleString();$("#sbusOverruns").textContent=overruns.toLocaleString();$("#sbusInvalidFrames").textContent=invalid.toLocaleString();
   const protocol=receiverConfig.protocol||"SBUS";$("#sbusDiagnosticMessage").textContent=!valid?`No valid ${protocol} signal.`:issues>0?`${protocol} errors detected: check signal wire, ground, connector and receiver power.`:`No ${protocol} communication errors detected since startup.`;
 }
-function saveState(text,type=""){const el=$("#saveState");el.textContent=text;el.className=`save-state ${type}`}
+function saveState(text,type=""){if(state.connected&&$("#rollP").value===""){text="PID read pending · select Read again";type="dirty"}const el=$("#saveState");el.textContent=text;el.className=`save-state ${type}`}
 function hasCapability(name){return state.capabilities.has(name)}
 function setCapabilityControls(selector,name){
   document.querySelectorAll(selector).forEach(element=>{
@@ -329,7 +329,7 @@ function updateBlackboxDownloadProgress(flightId,next,total){
 function renderOsdLayout(){
   const container=$("#osdPreviewItems");container.replaceChildren();
   osdElements.forEach((element,index)=>{
-    const position=osdLayout.positions[index],row=Math.floor(position/30),column=position%30,text=osdElementText(index),cellCount=Math.min(12,text.length);
+    const requested=osdLayout.positions[index],position=index===6?requested-requested%30+Math.min(24,requested%30):requested,row=Math.floor(position/30),column=position%30,text=osdElementText(index),cellCount=Math.min(12,text.length);
     const item=document.createElement("div");item.className=`osd-preview-item${osdLayout.mask&(1<<index)?"":" disabled"}${osdLayout.selected===index?" selected":""}`;
     item.dataset.osdElement=index;item.draggable=true;item.style.gridTemplateColumns=`repeat(${cellCount},1fr)`;
     item.style.width=`${cellCount/30*100}%`;item.replaceChildren(...Array.from(text.slice(0,cellCount),character=>{const cell=document.createElement("span");cell.textContent=character===" "?"\u00a0":character;return cell}));
@@ -426,6 +426,7 @@ function applyCapabilities(){
   [buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(element=>element.disabled=!state.connected||!hasCapability("PIDS"));
   $("#startPidDiagnosticButton").disabled=!state.connected||!hasCapability("PID_SIM")||!$("#pidDiagnosticSafety").checked;
   updateDfuButton();
+  updateBatteryCurrent(NaN);
   updateMainLoopButton();
   if(!state.connected){state.imuName="";$("#diagnosticImuName").textContent="IMU —"}
 }
@@ -499,7 +500,20 @@ function updateBattery(voltage){
   $("#batteryFill").style.width=`${percent}%`;$("#batteryVoltage").textContent=`${voltage.toFixed(2)} V`;
   status.title=`${cells}S estimated · ${cellVoltage.toFixed(2)} V per cell`;
 }
+function updateBatteryCurrent(current){
+  if(!state.connected)state.currentAdc=null;
+  state.batteryCurrent=current;
+  const usable=state.connected&&hasCapability("BATTERY_CURRENT");
+  const diagnostic=hasCapability("CURRENT_ADC_DIAGNOSTICS")?state.currentAdc:null;
+  const stale=diagnostic&&(diagnostic.samples===0||diagnostic.ageMs>2000);
+  const valid=usable&&!stale&&Number.isFinite(current)&&current>=0;
+  $("#batteryCurrent").textContent=valid?`${current.toFixed(2)} A`:"— A";
+  $("#batteryCurrentStatus").className=valid?"current-status":"current-status disabled";
+  $("#batteryCurrentStatus").title=!state.connected?"Board not connected":!usable?"Current sensor not available":valid?"Instantaneous current draw":"Waiting for current reading";
+  if(diagnostic)$("#batteryCurrentStatus").title+=` · Sensor ${(diagnostic.raw*3300/4095).toFixed(1)} mV · ${diagnostic.samples} samples · ${diagnostic.ageMs} ms since last sample · ${diagnostic.errors} conversion errors`;
+}
 function connected(value){
+  if(!value)clearPidRead();
   state.connected=value;$("#connectionDot").classList.toggle("online",value);$("#deviceDot").classList.toggle("online",value);
   updateConnectionText();buttons.connect.textContent=value?"Disconnect":"Connect";
   document.querySelectorAll("[data-pid]").forEach(i=>i.disabled=!value);[buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(b=>b.disabled=!value);
@@ -531,7 +545,7 @@ function connected(value){
   updateFirmwareCompatibility();
 }
 function log(line,direction="RX"){
-  if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG BATTERY_VOLTAGE")||line.startsWith("@CFG SBUS_DIAGNOSTICS")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line.startsWith("@CFG BLACKBOX_LOG ")||line.startsWith("@CFG BLACKBOX_BINARY ")||line.startsWith("@CFG BLACKBOX_CHUNK_END")||line==="PING")return;
+  if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG BATTERY_VOLTAGE")||line.startsWith("@CFG BATTERY_CURRENT")||line.startsWith("@CFG SBUS_DIAGNOSTICS")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line.startsWith("@CFG BLACKBOX_LOG ")||line.startsWith("@CFG BLACKBOX_BINARY ")||line.startsWith("@CFG BLACKBOX_CHUNK_END")||line==="PING")return;
   const out=$("#consoleOutput");if(!state.count)out.textContent="";out.textContent+=`${new Date().toLocaleTimeString()}  ${direction}  ${line}\n`;out.scrollTop=out.scrollHeight;
   $("#messageCount").textContent=`${++state.count} messages`;
 }
@@ -544,7 +558,7 @@ async function enterDfuMode(){
 }
 window.flightCodeConfigurator={
   board:()=>state.board,
-  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","SEQUREH7V2","PICO2_W"].includes(state.board),
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","SEQUREH7V2","HUMMINGBIRD_200RS","PICO2_W"].includes(state.board),
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
@@ -917,8 +931,29 @@ function telemetry(parts){
   if(firstTelemetry||wasSignal!==signal)badge($("#receiverState"),signal?"SIGNAL OK":"NO SIGNAL",signal?"online":"");
   if(firstTelemetry||wasArmed!==armed||wasCalibrated!==calibrated)badge($("#flightState"),armed?"ARMED":calibrated?"DISARMED":"CALIBRATING",armed?"armed":calibrated?"online":"");
 }
-function setPids(values){let i=0;axes.forEach(([key])=>terms.forEach(term=>{$(`#${key}${term}`).value=Math.round(Number(values[i++]))}))}
-function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const value=Number($(`#${key}${term}`).value),maximum=term==="D"?5000:2000;if(!Number.isInteger(value)||value<0||value>maximum)throw new Error(`Invalid ${label} ${term} value`);return value}))}
+function clearPidRead(){
+  clearTimeout(state.pidReadTimer);state.pidReadTimer=null;
+  axes.forEach(([key])=>terms.forEach(term=>{$(`#${key}${term}`).value=""}));
+}
+function requestPids(attempt=0){
+  clearTimeout(state.pidReadTimer);state.pidReadTimer=null;
+  if(!state.connected||!hasCapability("PIDS"))return;
+  send("GET_PIDS",false).catch(error=>showError(error.message));
+  state.pidReadTimer=setTimeout(()=>{
+    state.pidReadTimer=null;
+    if($("#rollP").value!=="")return;
+    if(attempt<2)requestPids(attempt+1);
+    else saveState("PID read failed · select Read again","dirty");
+  },750);
+}
+function setPids(values){
+  const parsed=values.map(Number);
+  if(parsed.length!==9||values.some(value=>String(value).trim()==="")||parsed.some((value,i)=>!Number.isInteger(value)||value<0||value>(i%3===2?5000:2000)))return false;
+  clearTimeout(state.pidReadTimer);state.pidReadTimer=null;
+  let i=0;axes.forEach(([key])=>terms.forEach(term=>{$(`#${key}${term}`).value=String(parsed[i++])}));
+  return true;
+}
+function getPids(){return axes.flatMap(([key,label])=>terms.map(term=>{const raw=$(`#${key}${term}`).value;if(raw.trim()==="")throw new Error("PID values have not been read. Select Read again before applying or saving.");const value=Number(raw),maximum=term==="D"?5000:2000;if(!Number.isInteger(value)||value<0||value>maximum)throw new Error(`Invalid ${label} ${term} value`);return value}))}
 function pidsCommand(){return `SET_PIDS ${getPids().join(" ")}`}
 function setRates(values){["rollRate","pitchRate","yawRate"].forEach((id,i)=>$(`#${id}`).value=Number(values[i]).toFixed(0));$("#rateExpo").value=Number(values[3]).toFixed(2)}
 function getRates(){
@@ -971,6 +1006,15 @@ function line(value){
   if(blackbox.downloading&&["TELEMETRY","BATTERY_VOLTAGE","BATTERY_CURRENT","SBUS_DIAGNOSTICS"].includes(p[1]))return;
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}
+  if(p[1]==="BATTERY_CURRENT"){updateBatteryCurrent(p.length>2&&p[2]!==""?Number(p[2]):NaN);return}
+  if(p[1]==="BATTERY_CURRENT_ADC"){
+    const values=p.slice(2,6).map(Number);
+    if(values.length===4&&values.every(value=>Number.isInteger(value)&&value>=0)&&values[0]<=4095){
+      state.currentAdc={raw:values[0],samples:values[1],ageMs:values[2],errors:values[3]};
+      updateBatteryCurrent(state.batteryCurrent);
+    }
+    return;
+  }
   if(p[1]==="VBAT_MULTIPLIER"){
     const multiplier=Number(p[2]);if(Number.isFinite(multiplier))$("#vbatMultiplier").value=multiplier.toFixed(3);
     $("#vbatMultiplierState").textContent=p[3]==="1"?"Saved to flash":"Applied · not saved";return;
@@ -1067,11 +1111,12 @@ function line(value){
     $("#receiverState").title=`Frame age: ${age===4294967295?"never":`${age} ms`} · Valid: ${frames} · UART errors: ${errors} · Recoveries: ${recoveries} · Overruns: ${overruns} · Invalid: ${invalid}`;return
   }
   if(p[1]==="HELLO"){
-    clearInterval(state.helloTimer);state.helloTimer=null;
+    clearInterval(state.helloTimer);state.helloTimer=null;clearPidRead();
     if(!["FlightCode","FlightCodePI"].includes(p[2])){showError(`Unrecognized device: ${p[2]||"unknown"}`);return}
     state.protocol=Number(p[3])||1;state.board=p[4]||p[2]||"UNKNOWN";state.firmwareVersion=p[5]||"";state.capabilities=new Set();osdLayout.mask&=~64;osdLayout.positions[6]=85;state.osdDirty=false;setReceiverProtocols(["SBUS"],false);updateConnectionText();updateFirmwareCompatibility();
     if(state.protocol<3&&p[2]==="FlightCode")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL","BOARD_ALIGNMENT","MOTOR_DIRECTION","MOTOR_IDLE","RATES","FEEDFORWARD","TPA","GYRO_CALIBRATION","FLIGHT_LOG","PID_SIM","DFU","TELEMETRY_EXT"]);
     if(state.protocol<3&&p[2]==="FlightCodePI")state.capabilities=new Set(["PIDS","MOTOR_TEST","TELEMETRY","MOTOR_PROTOCOL"]);
+    if(state.protocol<3&&hasCapability("PIDS"))requestPids();
     updateMotorProtocolOptions();applyCapabilities();window.firmwareFlasher?.setDetectedBoard?.(state.board);
     $("#deviceName").textContent=`FlightCode · ${state.board}`;view("setup");toast(`${state.board} detected`);
     if(hasCapability("FLIGHT_LOG"))send("GET_FLIGHT_LOG_INFO",false);
@@ -1080,6 +1125,10 @@ function line(value){
   }
   if(p[1]==="CAPABILITIES"){
     state.capabilities=new Set(p.slice(2));updateMotorProtocolOptions();applyCapabilities();
+    if(hasCapability("PIDS"))requestPids();
+    updateBatteryCurrent(NaN);
+    if(hasCapability("BATTERY_CURRENT"))send("GET_BATTERY_CURRENT",false);
+    if(hasCapability("CURRENT_ADC_DIAGNOSTICS"))send("GET_BATTERY_CURRENT_ADC",false);
     if(hasCapability("MAIN_LOOP"))send("GET_MAIN_LOOP",false);
     if(hasCapability("VBAT_CALIBRATION"))send("GET_VBAT_MULTIPLIER",false);
     if(hasCapability("OSD_LAYOUT"))send("GET_OSD_LAYOUT",false);
@@ -1158,7 +1207,7 @@ function line(value){
     if(next<flightLog.count)send(`GET_FLIGHT_LOG_CHUNK ${next} 8`,false);else finishFlightLogDownload();
     return;
   }
-  if(p[1]==="PIDS"&&p.length>=12){setPids(p.slice(2,11),true);setActiveTuningProfile(null);saveState(p[11]==="1"?"Saved to flash":"Unsaved changes",p[11]==="1"?"saved":"dirty");return}
+  if(p[1]==="PIDS"&&p.length>=12){if(!setPids(p.slice(2,11)))return;setActiveTuningProfile(null);saveState(p[11]==="1"?"Saved to flash":"Unsaved changes",p[11]==="1"?"saved":"dirty");return}
   if(p[1]==="RATES"&&p.length>=7){setRates(p.slice(2,6));saveState(p[6]==="1"?"Saved to flash":"Unsaved changes",p[6]==="1"?"saved":"dirty");return}
   if(p[1]==="FEEDFORWARD"&&p.length>=6){setFeedforward(p.slice(2,5),true);saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
   if(p[1]==="TPA"&&p.length>=5){setTpa([Number(p[2])*100,Number(p[3])]);saveState(p[4]==="1"?"Saved to flash":"Unsaved changes",p[4]==="1"?"saved":"dirty");return}

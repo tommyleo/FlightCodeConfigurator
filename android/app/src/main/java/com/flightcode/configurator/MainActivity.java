@@ -120,7 +120,7 @@ public final class MainActivity extends Activity {
         private UsbDevice selectDevice() {
             for (UsbDevice candidate : manager.getDeviceList().values()) {
                 int vendor = candidate.getVendorId(), product = candidate.getProductId();
-                if ((vendor == 0x0483 && product == 0x5740) || (vendor == 0x2e8a && (product == 0x0009 || product == 0x000a))) return candidate;
+                if (((vendor == 0x0483 || vendor == 0x2e3c) && product == 0x5740) || (vendor == 0x2e8a && (product == 0x0009 || product == 0x000a))) return candidate;
             }
             return null;
         }

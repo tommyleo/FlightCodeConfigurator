@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('app.js','utf8'),nodes=new Map(),sent=[],timers=new Map();let id=0;
+const context=vm.createContext({state:{connected:true},axes:[['roll','ROLL'],['pitch','PITCH'],['yaw','YAW']],terms:['P','I','D'],$:key=>{if(!nodes.has(key))nodes.set(key,{value:''});return nodes.get(key)},clearTimeout:key=>timers.delete(key),setTimeout:fn=>{timers.set(++id,fn);return id},hasCapability:()=>true,send:command=>{sent.push(command);return Promise.resolve()},showError:message=>{throw Error(message)}});
+for(const name of ['clearPidRead','requestPids','setPids'])vm.runInContext(source.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))[0],context);
+for(const name of ['getPids','pidsCommand','saveState'])vm.runInContext(source.split('\n').find(line=>line.startsWith('function '+name+'(')),context);
+const runTimer=()=>{const [key,fn]=timers.entries().next().value;timers.delete(key);fn()};
+context.clearPidRead();assert.throws(()=>context.getPids(),/not been read/);context.saveState('Saved to flash','saved');assert.match(nodes.get('#saveState').textContent,/PID read pending/);
+context.requestPids();runTimer();runTimer();runTimer();assert.equal(sent.length,3);assert.equal(timers.size,0);
+context.requestPids();assert.equal(context.setPids(['110','185','110','110','200','110','150','260','0']),true);assert.equal(timers.size,0);assert.equal(context.pidsCommand(),'SET_PIDS 110 185 110 110 200 110 150 260 0');context.saveState('Saved to flash','saved');assert.equal(nodes.get('#saveState').textContent,'Saved to flash');
+assert.equal(context.setPids(['110','185','oops']),false);assert.equal(context.pidsCommand(),'SET_PIDS 110 185 110 110 200 110 150 260 0');
+context.clearPidRead();assert.throws(()=>context.pidsCommand(),/not been read/);assert.equal(context.setPids(Array(9).fill(0)),true);assert.equal(context.pidsCommand(),'SET_PIDS 0 0 0 0 0 0 0 0 0');
+context.clearPidRead();context.state.connected=false;const before=sent.length;context.requestPids();assert.equal(sent.length,before);
+const android=fs.readFileSync('android/app/src/main/assets/configurator/app.js','utf8');assert.equal(android,source);
+console.log('PID read recovery, exact flight values, missing-value save guard, malformed replies, explicit zeros and disconnect tests passed');

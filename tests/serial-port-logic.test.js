@@ -22,3 +22,10 @@ const port=(name,usbVendorId,usbProductId)=>({name,getInfo:()=>({usbVendorId,usb
 }
 
 console.log("serial-port-logic tests passed");
+
+{
+  const at32=port('hummingbird',0x2e3c,0x5740);
+  const dfu=port('bootloader',0x2e3c,0xdf11);
+  const pico=port('pico',0x2e8a,0x0009);
+  assert.deepStrictEqual(logic.preferredPorts([pico,dfu,at32]).map(p=>p.name),['hummingbird','pico']);
+}

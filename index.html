@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
-  <title>FlightCode Configurator 1.5.0</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-1">
+  <title>FlightCode Configurator 1.5.1</title>
+  <link rel="stylesheet" href="styles.css?v=20261003-current-six">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
   <link rel="stylesheet" href="firmware-flasher.css?v=20260819-2">
@@ -14,9 +14,9 @@
   <header class="topbar">
     <div class="brand">
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
-      <div><b>FlightCode</b><small>CONFIGURATOR · v1.5.0</small></div>
+      <div><b>FlightCode</b><small>CONFIGURATOR · v1.5.1</small></div>
     </div>
-    <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
+    <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><div id="batteryCurrentStatus" class="current-status disabled" title="Board not connected"><b id="batteryCurrent">— A</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
   </header>
   <div class="shell">
@@ -82,7 +82,7 @@
         <section class="project-links" aria-labelledby="projectLinksTitle">
           <header><div><small>OPEN-SOURCE FIRMWARE</small><h2 id="projectLinksTitle">FlightCode projects</h2></div><p>Source code, board documentation, build instructions, releases, and issue tracking.</p></header>
           <div class="project-link-grid">
-            <a class="project-link" href="https://github.com/tommyleo/FlightCode" target="_blank" rel="noopener noreferrer"><span>STM32 FLIGHT CONTROLLERS</span><strong>FlightCode</strong><p>Firmware for supported STM32F4 and STM32H7 boards, with board-specific OSD, receiver, Blackbox, diagnostics, and DFU features.</p><b>Open repository <i aria-hidden="true">↗</i></b></a>
+            <a class="project-link" href="https://github.com/tommyleo/FlightCode" target="_blank" rel="noopener noreferrer"><span>STM32 / AT32 FLIGHT CONTROLLERS</span><strong>FlightCode</strong><p>Firmware for supported STM32F4, STM32H7 and AT32F435 boards, with board-specific OSD, receiver, Blackbox, diagnostics, and DFU features.</p><b>Open repository <i aria-hidden="true">↗</i></b></a>
             <a class="project-link" href="https://github.com/tommyleo/FlightCodePI" target="_blank" rel="noopener noreferrer"><span>RASPBERRY PI PICO 2</span><strong>FlightCodePI</strong><p>Firmware for Pico 2 and Pico 2 W controllers, with SBUS, DSHOT, configurable PID control, protected diagnostics, flight logs, and UF2 flashing.</p><b>Open repository <i aria-hidden="true">↗</i></b></a>
           </div>
         </section>
@@ -251,7 +251,7 @@
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="3"><span><b>FlightCode logo</b><small>FLIGHTCODE</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="4"><span><b>Pilot name</b><small id="osdPilotPreview">PILOT</small></span><i aria-hidden="true"></i></button>
               <button type="button" class="osd-palette-item" draggable="true" data-osd-element="5"><span><b>VTX</b><small>F:3:200</small></span><i aria-hidden="true"></i></button>
-              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="6"><span><b>Current</b><small>100A</small></span><i aria-hidden="true"></i></button>
+              <button type="button" class="osd-palette-item" draggable="true" data-osd-element="6"><span><b>Current</b><small>999.9A</small></span><i aria-hidden="true"></i></button>
               <label class="osd-pilot-field"><span>Pilot name</span><input id="osdPilotName" maxlength="12" placeholder="PILOT" autocomplete="off" disabled></label>
             </div>
             <div class="osd-preview-wrap">
@@ -360,12 +360,12 @@
       <section id="firmwareView" class="view">
         <header class="heading"><div><small id="firmwareModeLabel">MAINTENANCE / FIRMWARE</small><h1>Firmware flasher</h1></div><b id="firmwareDfuState" class="badge">WAITING</b></header>
         <article id="firmwareWarning" class="firmware-warning">
-          <strong id="firmwareWarningTitle">STM32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO ONLY</strong>
+          <strong id="firmwareWarningTitle">STM32 / AT32 FLIGHT CONTROLLERS AND RASPBERRY PI PICO</strong>
           <p id="firmwareWarningText">The configurator selects the correct flashing protocol from the connected board.</p>
         </article>
         <article class="firmware-card">
           <div class="firmware-fields">
-            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="FLYWOOF405NANO_ANALOG">Flywoo GN405 Nano Analog</option><option value="SEQUREH7V2">SEQURE H743 V2</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
+            <label><small>TARGET BOARD</small><select id="firmwareTarget"><option value="">Select board…</option><option value="MAMBAF411">Mamba F411</option><option value="CLRACINGF4">CLRacing F4</option><option value="FLYWOOF405NANO">Flywoo GN405 Nano V3</option><option value="FLYWOOF405NANO_ANALOG">Flywoo GN405 Nano Analog</option><option value="SEQUREH7V2">SEQURE H743 V2</option><option value="HUMMINGBIRD_200RS">NewBeeDrone Hummingbird 200 RaceSpec</option><option value="PICO2_W">Raspberry Pi Pico 2 W</option></select></label>
             <label><small id="firmwareFileTypeLabel">LOCAL FIRMWARE</small><input id="firmwareFile" type="file" accept=".hex,.uf2,text/plain,application/octet-stream"></label>
           </div>
           <div class="firmware-file-info">
@@ -398,11 +398,11 @@
   <script src="diagnostic-logic.js?v=20260805-2"></script>
   <script src="attitude-logic.js?v=20260805-2"></script>
   <script src="blackbox-logic.js?v=20260919-log-v9"></script>
-  <script src="serial-port-logic.js?v=20260809-1"></script>
-  <script src="webusb-serial.js?v=20260817-2"></script>
+  <script src="serial-port-logic.js?v=20261003-current-six"></script>
+  <script src="webusb-serial.js?v=20261003-current-six"></script>
   <script src="android-usb-serial.js?v=20260824-1"></script>
-<script src="app.js?v=20260919-log-v9"></script>
+<script src="app.js?v=20261003-pid-read"></script>
   <script src="pico-flasher.js"></script>
-  <script src="firmware-flasher.js?v=20260810-1"></script>
+  <script src="firmware-flasher.js?v=20261003-current-six"></script>
 </body>
 </html>
