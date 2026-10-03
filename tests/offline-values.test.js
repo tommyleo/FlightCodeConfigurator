@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('app.js','utf8'),nodes=new Map();
+const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'123',textContent:'123',checked:true,placeholder:'Read pending',style:{width:'50%'},replaceChildren(){this.textContent=''}});return nodes.get(id)};
+const controls=[{type:'number',value:'110'},{type:'text',value:'PILOT'},{type:'select-one',value:'UART1'},{type:'checkbox',checked:true},{type:'range',value:'0'}],outputs=[{textContent:'0%'}];
+const context=vm.createContext({$:node,document:{querySelectorAll:selector=>selector.includes('output')?outputs:controls}});
+vm.runInContext(source.match(/function clearOfflineBoardValues\(\)\{[\s\S]*?\n\}/)[0],context);
+context.clearOfflineBoardValues();assert.equal(controls[0].value,'');assert.equal(controls[1].value,'');assert.equal(controls[2].value,'');assert.equal(controls[3].checked,false);assert.equal(controls[4].value,'0');assert.equal(outputs[0].textContent,'');
+for(const id of ['#batteryVoltage','#batteryCurrent','#channelValue0','#channelValue15','#gyroRoll','#blackboxDropped','#modeRangeValue0','#osdPilotPreview'])assert.equal(node(id).textContent,'');
+assert.equal(node('#osdPilotName').placeholder,'');assert.equal(node('#channelFill0').style.width,'0%');
+assert.doesNotMatch(source,/placeholder="Read pending"/);assert.match(source,/if\(!value\)clearOfflineBoardValues\(\)/);assert.match(source,/vtxTables\[\$\("#vtxTable"\)\.value\|\|vtxConfig\.table\]/);
+assert.equal(source,fs.readFileSync('android/app/src/main/assets/configurator/app.js','utf8'));
+console.log('Offline numeric/text/select values, telemetry, OSD, motor outputs and Android parity passed');

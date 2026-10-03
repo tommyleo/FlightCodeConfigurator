@@ -63,8 +63,8 @@ const $=s=>document.querySelector(s);
 axes.forEach(([key,label],axis)=>{
   const card=document.createElement("article");card.className="axis-card";
   card.innerHTML=`<header><b>${label}</b><small>ASSE 0${axis+1}</small></header><div class="axis-fields">${
-    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="${term==="D"?5000:2000}" step="1" value="" placeholder="Read pending" disabled></div>`).join("")
-  }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1000" step="1" value="0" disabled></div></div>`;
+    terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="${term==="D"?5000:2000}" step="1" value="" disabled></div>`).join("")
+  }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1000" step="1" value="" disabled></div></div>`;
   $("#pidGrid").append(card);
 });
 for(let i=0;i<16;i++){
@@ -128,7 +128,7 @@ function validateSerialAssignments(){
   const unavailable=protocol!=="OFF"&&!(supported[state.board]||[]).includes(port);
   const unsupportedProtocol=state.board==="PICO2_W"&&protocol!=="OFF"&&protocol!=="HDZERO_MSP";
   const usable=state.connected&&hasCapability("VTX_CONFIG"),hdzero=protocol==="HDZERO_MSP";
-  const table=hdzero?vtxTables.HDZERO:vtxTables[$("#vtxTable").value],band=$("#vtxBand"),selectedBand=band.value;
+  const table=hdzero?vtxTables.HDZERO:vtxTables[$("#vtxTable").value||vtxConfig.table],band=$("#vtxBand"),selectedBand=band.value;
   band.replaceChildren(...Object.keys(table).map(value=>new Option(value,value)));
   band.value=Object.hasOwn(table,selectedBand)?selectedBand:Object.keys(table)[0];
   const frequencies=table[band.value],channel=$("#vtxChannel"),selectedChannel=Number(channel.value)||1;
@@ -155,7 +155,7 @@ function validateSerialAssignments(){
 function receiverCommand(){const c=getReceiverConfig(),arm=c.modes.find(m=>m.fn==="ARM"),beep=c.modes.find(m=>m.fn==="BEEP");return `SET_RECEIVER_CONFIG ${c.protocol} ${c.port} ${c.order} ${arm.channel} ${arm.min} ${arm.max} ${beep.channel} ${beep.min} ${beep.max}`}
 [0,1].forEach(i=>{$(`#modeMin${i}`).oninput=()=>updateModeRange(i);$(`#modeMax${i}`).oninput=()=>updateModeRange(i)});setReceiverConfig(receiverConfig);
 $("#receiverProtocol").onchange=()=>{updateReceiverProtocolUi();$("#receiverConfigState").textContent="Unsaved changes";validateSerialAssignments()};
-function renderVtxTable(){const hdzero=$("#vtxProtocol").value==="HDZERO_MSP",region=hdzero?"HDZERO":$("#vtxTable").value,table=vtxTables[region],first=Object.values(table)[0];$("#vtxTableTitle").textContent=hdzero?"HDZero Race V3 frequency table":`${region} frequency table`;$("#vtxFrequencyTable").innerHTML=`<table><thead><tr><th>Band</th>${first.map((_,i)=>`<th>CH ${i+1}</th>`).join("")}</tr></thead><tbody>${Object.entries(table).map(([band,frequencies])=>`<tr><th>${band}</th>${frequencies.map(f=>`<td class="${f?"":"disabled"}">${f||"—"}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
+function renderVtxTable(){const hdzero=$("#vtxProtocol").value==="HDZERO_MSP",region=hdzero?"HDZERO":($("#vtxTable").value||vtxConfig.table),table=vtxTables[region],first=Object.values(table)[0];$("#vtxTableTitle").textContent=hdzero?"HDZero Race V3 frequency table":`${region} frequency table`;$("#vtxFrequencyTable").innerHTML=`<table><thead><tr><th>Band</th>${first.map((_,i)=>`<th>CH ${i+1}</th>`).join("")}</tr></thead><tbody>${Object.entries(table).map(([band,frequencies])=>`<tr><th>${band}</th>${frequencies.map(f=>`<td class="${f?"":"disabled"}">${f||"—"}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
 function setVtxConfig(config,saved=false){vtxConfig={...vtxConfig,...config};$("#vtxProtocol").value=vtxConfig.protocol;$("#vtxSerialPort").value=vtxConfig.port;$("#vtxTable").value=vtxConfig.table;validateSerialAssignments();$("#vtxBand").value=vtxConfig.band;validateSerialAssignments();$("#vtxChannel").value=vtxConfig.channel;$("#vtxPower").value=vtxConfig.power;$("#vtxConfigState").textContent=saved?"Saved to flash":"Unsaved changes";renderVtxTable()}
 function vtxCommand(){return `SET_VTX_CONFIG ${$("#vtxProtocol").value} ${$("#vtxSerialPort").value} ${$("#vtxTable").value} ${$("#vtxBand").value} ${$("#vtxChannel").value} ${$("#vtxPower").value}`}
 document.querySelectorAll("[data-vtx-config]").forEach(el=>el.onchange=()=>{$("#vtxConfigState").textContent="Unsaved changes";if(el.id==="vtxTable")renderVtxTable();validateSerialAssignments()});$("#receiverSerialPort").addEventListener("change",validateSerialAssignments);renderVtxTable();
@@ -512,6 +512,21 @@ function updateBatteryCurrent(current){
   $("#batteryCurrentStatus").title=!state.connected?"Board not connected":!usable?"Current sensor not available":valid?"Instantaneous current draw":"Waiting for current reading";
   if(diagnostic)$("#batteryCurrentStatus").title+=` · Sensor ${(diagnostic.raw*3300/4095).toFixed(1)} mV · ${diagnostic.samples} samples · ${diagnostic.ageMs} ms since last sample · ${diagnostic.errors} conversion errors`;
 }
+function clearOfflineBoardValues(){
+  document.querySelectorAll('.view input:not([type="file"]),.view select:not(#firmwareTarget)').forEach(input=>{
+    if(input.type==="checkbox")input.checked=false;
+    else if(input.type!=="range")input.value="";
+  });
+  document.querySelectorAll('.view output').forEach(output=>output.textContent="");
+  const ids=["loopFrequency","loopMaxPeriod","gyroRoll","gyroPitch","gyroYaw","gyroPitchRaw","accelX","accelY","accelZ","attitudeRoll","attitudePitch","attitudeYaw","batteryVoltage","batteryCurrent","sbusFrameAge","sbusValidFrames","sbusUartErrors","sbusRecoveries","sbusOverruns","sbusInvalidFrames","blackboxCapacity","blackboxCapacityDetail","blackboxStored","blackboxDropped","blackboxFlightCount","blackboxWrittenDetail","blackboxDroppedDetail","osdPilotPreview","osdGridPosition","osdGridFormat"];
+  ids.forEach(id=>{const node=$(`#${id}`);if(node)node.textContent=""});
+  for(let i=0;i<16;i++){$(`#channelValue${i}`).textContent="";$(`#channelFill${i}`).style.width="0%"}
+  for(let i=0;i<2;i++){
+    ["modeLiveValue","modeRangeValue"].forEach(prefix=>{const node=$(`#${prefix}${i}`);if(node)node.textContent=""});
+  }
+  $("#osdPilotName").placeholder="";$("#osdPreviewItems").replaceChildren();
+  $("#vtxFrequencyTable").replaceChildren();
+}
 function connected(value){
   if(!value)clearPidRead();
   state.connected=value;$("#connectionDot").classList.toggle("online",value);$("#deviceDot").classList.toggle("online",value);
@@ -543,6 +558,7 @@ function connected(value){
   if(!value&&pidDiagnostic.running)cancelPidDiagnostic("Check interrupted: board disconnected.");
   applyCapabilities();
   updateFirmwareCompatibility();
+  if(!value)clearOfflineBoardValues();
 }
 function log(line,direction="RX"){
   if(line.includes("@CFG TELEMETRY")||line.startsWith("@CFG BATTERY_VOLTAGE")||line.startsWith("@CFG BATTERY_CURRENT")||line.startsWith("@CFG SBUS_DIAGNOSTICS")||line.startsWith("@CFG FLIGHT_LOG ")||line.startsWith("@CFG FLIGHT_LOG_CHUNK_END")||line.startsWith("@CFG BLACKBOX_LOG ")||line.startsWith("@CFG BLACKBOX_BINARY ")||line.startsWith("@CFG BLACKBOX_CHUNK_END")||line==="PING")return;
@@ -570,6 +586,7 @@ function renderQuaternion(q){
 let latestAttitudeGyro=[0,0,0],latestAttitudeAccel=[0,0,0],attitudeFramePending=false;
 function renderAttitudeFrame(){
   attitudeFramePending=false;
+  if(!state.connected){clearOfflineBoardValues();return}
   renderQuaternion(state.q);
   $("#loopFrequency").textContent=state.loopHz.toLocaleString("en-US");
   $("#loopMaxPeriod").textContent=state.maxLoopPeriodUs||"—";
@@ -583,7 +600,7 @@ function attitude(timestamp,gyro,accel){
   if(!attitudeFramePending){attitudeFramePending=true;requestAnimationFrame(renderAttitudeFrame)}
 }
 let pendingChannelValues=null,channelFramePending=false;
-function channels(values){pendingChannelValues=values;if(channelFramePending)return;channelFramePending=true;requestAnimationFrame(()=>{channelFramePending=false;pendingChannelValues.forEach((value,i)=>{const pct=Math.max(0,Math.min(100,(value-900)/12)),mode=receiverConfig.modes.find(m=>m.channel===i+1),active=mode&&value>=mode.min&&value<=mode.max;$(`#channelFill${i}`).style.width=`${pct}%`;$(`#channelFill${i}`).style.background=active?"var(--green)":"var(--cyan)";$(`#channelValue${i}`).textContent=`${Math.round(value)} µs`});receiverConfig.modes.forEach((mode,i)=>{const value=pendingChannelValues[mode.channel-1],active=Number.isFinite(value)&&value>=mode.min&&value<=mode.max,row=$(`#modeFunction${i}`).closest(".receiver-mode");row.classList.toggle("active",active);$(`#modeLiveStatus${i}`).textContent=active?"ACTIVE":"INACTIVE";$(`#modeLiveValue${i}`).textContent=Number.isFinite(value)?`${Math.round(value)} µs live`:"—"})})}
+function channels(values){pendingChannelValues=values;if(channelFramePending)return;channelFramePending=true;requestAnimationFrame(()=>{channelFramePending=false;if(!state.connected){clearOfflineBoardValues();return}pendingChannelValues.forEach((value,i)=>{const pct=Math.max(0,Math.min(100,(value-900)/12)),mode=receiverConfig.modes.find(m=>m.channel===i+1),active=mode&&value>=mode.min&&value<=mode.max;$(`#channelFill${i}`).style.width=`${pct}%`;$(`#channelFill${i}`).style.background=active?"var(--green)":"var(--cyan)";$(`#channelValue${i}`).textContent=`${Math.round(value)} µs`});receiverConfig.modes.forEach((mode,i)=>{const value=pendingChannelValues[mode.channel-1],active=Number.isFinite(value)&&value>=mode.min&&value<=mode.max,row=$(`#modeFunction${i}`).closest(".receiver-mode");row.classList.toggle("active",active);$(`#modeLiveStatus${i}`).textContent=active?"ACTIVE":"INACTIVE";$(`#modeLiveValue${i}`).textContent=Number.isFinite(value)?`${Math.round(value)} µs live`:"—"})})}
 function motors(values){void values}
 function diagnosticUi(instruction,result,type="",progress=0){
   $("#imuDiagnosticInstruction").textContent=instruction;
@@ -1002,7 +1019,7 @@ document.querySelectorAll("[data-pid],[data-rate],[data-feedforward],[data-tpa],
 function setAlignment(values){$("#boardRoll").value=Number(values[0]).toFixed(1);$("#boardPitch").value=Number(values[1]).toFixed(1);$("#boardYaw").value=Number(values[2]).toFixed(1)}
 function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{const value=Number($(`#${id}`).value);if(!Number.isFinite(value)||value < -180||value > 180)throw new Error("Angles must be between -180° and +180°");return value})}
 function line(value){
-  log(value);if(!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
+  log(value);if(!state.connected||!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
   if(blackbox.downloading&&["TELEMETRY","BATTERY_VOLTAGE","BATTERY_CURRENT","SBUS_DIAGNOSTICS"].includes(p[1]))return;
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}
