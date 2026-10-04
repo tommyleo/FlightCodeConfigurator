@@ -126,3 +126,5 @@
 .current-status.disabled{border-color:#53646b55;background:#111b20}
 .current-status.disabled b{color:#687980}
 @media(max-width:550px){.topbar{height:auto;min-height:74px;flex-wrap:wrap;padding-block:10px}.connection{margin-left:auto}.current-status{padding:6px 8px}}
+
+#setupView>.heading{margin-bottom:12px}.orientation-note{margin:0 0 24px;color:var(--muted);font-size:12px;line-height:1.6}
