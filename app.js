@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.5.1",MINIMUM_FIRMWARE_VERSION="1.4.0";
+const CONFIGURATOR_VERSION="1.6.0",MINIMUM_FIRMWARE_VERSION="1.4.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -124,10 +124,12 @@ function validateSerialAssignments(){
   const flywoo=state.board==="FLYWOOF405NANO"||state.board==="FLYWOOF405NANO_ANALOG";
   const invertedSbusPort=flywoo&&protocol!=="OFF"&&port==="UART5";
   const receiverPortInvalid=(flywoo||state.board==="CLRACINGF4")&&(receiverProtocol==="ELRS"?receiverPort!=="UART4":receiverPort!==(flywoo?"UART5":"UART1"));
-  const supported={MAMBAF411:["UART1","UART2"],CLRACINGF4:["UART1","UART3","UART4","UART6"],FLYWOOF405NANO:["UART4","UART6"],FLYWOOF405NANO_ANALOG:["UART4","UART6"],HDZERO_HALO:protocol==="HDZERO_MSP"?["UART1","UART2","UART4","UART5"]:["UART1","UART2","UART4"],SEQUREH7V2:["UART1","UART2","UART4","UART6","UART7"],HUMMINGBIRD_200RS:["UART5","UART7"],PICO2_W:["UART1"]};
+  const supported={MAMBAF411:["UART1","UART2"],CLRACINGF4:["UART1","UART3","UART4","UART6"],FLYWOOF405NANO:["UART4","UART6"],FLYWOOF405NANO_ANALOG:["UART4","UART6"],HDZERO_HALO:protocol==="HDZERO_MSP"?["UART1","UART2","UART4","UART5"]:["UART1","UART2","UART4"],SEQUREH7V2:["UART1","UART2","UART4","UART6","UART7"],FOXEERF722V4:["UART1","UART2","UART3","UART4","UART5","UART6"],FOXEERH743:["UART1","UART2","UART3","UART4","UART6","UART7","UART8"],HUMMINGBIRD_200RS:["UART5","UART7"],PICO2_W:["UART1"]};
   const unavailable=protocol!=="OFF"&&!(supported[state.board]||[]).includes(port);
   const unsupportedProtocol=state.board==="PICO2_W"&&protocol!=="OFF"&&protocol!=="HDZERO_MSP";
   const usable=state.connected&&hasCapability("VTX_CONFIG"),hdzero=protocol==="HDZERO_MSP";
+  $("#vtxLinkState").hidden=!hdzero;
+  if(!state.connected)$("#vtxLinkState").textContent="Waiting for HDZero communication";
   const table=hdzero?vtxTables.HDZERO:vtxTables[$("#vtxTable").value||vtxConfig.table],band=$("#vtxBand"),selectedBand=band.value;
   band.replaceChildren(...Object.keys(table).map(value=>new Option(value,value)));
   band.value=Object.hasOwn(table,selectedBand)?selectedBand:Object.keys(table)[0];
@@ -574,7 +576,7 @@ async function enterDfuMode(){
 }
 window.flightCodeConfigurator={
   board:()=>state.board,
-  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","SEQUREH7V2","HUMMINGBIRD_200RS","PICO2_W"].includes(state.board),
+  canEnterDfu:()=>state.connected&&hasCapability("DFU")&&!state.armed&&!state.motorTest&&["MAMBAF411","CLRACINGF4","FLYWOOF405NANO","FLYWOOF405NANO_ANALOG","SEQUREH7V2","FOXEERF722V4","FOXEERH743","HUMMINGBIRD_200RS","PICO2_W"].includes(state.board),
   enterDfu:enterDfuMode
 };
 function resetAttitude(){
@@ -1235,7 +1237,8 @@ function line(value){
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=11){setReceiverConfig({protocol:p[2],port:"UART1",order:p[3],modes:[{fn:"ARM",channel:Number(p[4]),min:Number(p[5]),max:Number(p[6])},{fn:"BEEP",channel:Number(p[7]),min:Number(p[8]),max:Number(p[9])}]},p[10]==="1");return}
   if(p[1]==="RECEIVER_CONFIG"&&p.length>=10){setReceiverConfig({protocol:"SBUS",order:p[2],modes:[{fn:"ARM",channel:Number(p[3]),min:Number(p[4]),max:Number(p[5])},{fn:"BEEP",channel:Number(p[6]),min:Number(p[7]),max:Number(p[8])}]},p[9]==="1");return}
   if(p[1]==="BOARD_ALIGNMENT"&&p.length>=6){setAlignment(p.slice(2,5));saveState(p[5]==="1"?"Saved to flash":"Unsaved changes",p[5]==="1"?"saved":"dirty");return}
-  if(p[1]==="VTX_STATUS"&&p.length>=3){const labels={APPLIED:"VTX confirmed at startup",NO_RESPONSE:"No response from VTX at startup. This may be normal if the battery is not connected and the VTX is not powered.",RACE_LOCKED:"VTX race lock is enabled",NOT_CONFIRMED:"VTX did not confirm channel / frequency / power",UNSUPPORTED_POWER:"Band/channel confirmed, but this SmartAudio version does not support the selected power",UART_ERROR:"Selected UART is unavailable",INVALID_SETTINGS:"Invalid VTX settings",NOT_CONFIGURED:"VTX control is disabled"};$("#vtxConfigState").textContent=labels[p[2]]||`VTX status: ${p[2]}`;return}
+  if(p[1]==="VTX_LINK_STATUS"&&p.length>=3){const labels={MSP_CONNECTED:"HDZero connected; waiting to send settings",MSP_SETTINGS_SENT:"HDZero connected; channel and power settings sent",INITIALIZING:"Waiting for HDZero communication",NO_RESPONSE:"No HDZero response. Check VTX power and both UART wires.",UART_ERROR:"Selected UART is unavailable",INVALID_SETTINGS:"Selected HDZero channel or power is unsupported",NOT_CONFIGURED:"HDZero control is disabled or requires a reboot"};$("#vtxLinkState").textContent=labels[p[2]]||`HDZero status: ${p[2]}`;return}
+  if(p[1]==="VTX_STATUS"&&p.length>=3){const labels={MSP_CONNECTED:"HDZero MSP connected; waiting to send settings",MSP_SETTINGS_SENT:"HDZero MSP connected; settings sent (RF state not confirmed)",INITIALIZING:"Waiting for VTX communication",APPLIED:"VTX confirmed at startup",NO_RESPONSE:"No response from VTX at startup. This may be normal if the battery is not connected and the VTX is not powered.",RACE_LOCKED:"VTX race lock is enabled",NOT_CONFIRMED:"VTX did not confirm channel / frequency / power",UNSUPPORTED_POWER:"Band/channel confirmed, but this SmartAudio version does not support the selected power",UART_ERROR:"Selected UART is unavailable",INVALID_SETTINGS:"Invalid VTX settings",NOT_CONFIGURED:"VTX control is disabled"};$("#vtxConfigState").textContent=labels[p[2]]||`VTX status: ${p[2]}`;return}
   if(p[1]==="MOTOR_PROTOCOL"){
     if(![...$("#motorProtocol").options].some(option=>option.value===p[2]))$("#motorProtocol").add(new Option(p[2],p[2]));
     $("#motorProtocol").value=p[2];return;

@@ -79,6 +79,8 @@ if(typeof window!=="undefined")window.FlightCodeDfu=FlightCodeDfu;
     FLYWOOF405NANO:{label:"Flywoo GN405 Nano V3",filename:"FLYWOOF405NANO",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     FLYWOOF405NANO_ANALOG:{label:"Flywoo GN405 Nano Analog",filename:"FLYWOOF405NANO_ANALOG",kind:"stm32",extension:".hex",firmwareEnd:0x080c0000,sectors:[16,16,16,16,64,128,128,128,128,128,128,128]},
     SEQUREH7V2:{label:"SEQURE H743 V2",filename:"SEQUREH7V2",kind:"stm32",extension:".hex",firmwareEnd:0x081c0000,transferSize:1024,sectors:[128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]},
+    FOXEERF722V4:{label:"Foxeer F722 V4 (ICM / MPU6000)",filename:"FOXEERF722V4",kind:"stm32",extension:".hex",firmwareEnd:0x08060000,transferSize:2048,sectors:[16,16,16,16,64,128,128,128]},
+    FOXEERH743:{label:"Foxeer H743 / H7 Mini MPU6000",filename:"FOXEERH743",kind:"stm32",extension:".hex",firmwareEnd:0x081c0000,transferSize:1024,sectors:[128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]},
     HUMMINGBIRD_200RS:{label:"NewBeeDrone Hummingbird 200 RaceSpec",filename:"HUMMINGBIRD_200RS",kind:"at32",extension:".hex",firmwareEnd:0x080ff800,transferSize:2048,sectors:Array(512).fill(2),usbFilter:{vendorId:0x2e3c,productId:0xdf11}},
     PICO2_W:{label:"Raspberry Pi Pico 2 W",filename:"FLIGHTCODEPI",kind:"pico",extension:".uf2",firmwareEnd:PICO_RESERVED_START}
   };

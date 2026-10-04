@@ -1,12 +1,12 @@
 # FlightCode Configurator
 
-Current release: **1.5.1**.
+Current release: **1.6.0**.
 
 ## FlightCode in action! 🚀
 
 **[Watch the flight video on YouTube](https://youtu.be/JjHND97abkM)**
 
-Shared Web Serial configurator for FlightCode firmware on STM32F4/H7, AT32F435 and
+Shared Web Serial configurator for FlightCode firmware on STM32F4/F7/H7, AT32F435 and
 FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
 available features and adapts the interface to the connected board.
 
@@ -91,7 +91,12 @@ On `FLYWOOF405NANO` and `HDZERO_HALO`, the Camera OSD tab controls the MSP
 DisplayPort overlay using an HDZero-compatible 30 × 16 canvas centered in the
 HD display. The VTX tab selects `HDZERO_MSP` and the connected UART; Flywoo HD
 defaults to UART6 and Halo defaults to UART5 on a fresh firmware configuration.
-All supported STM32 targets can use MSP DisplayPort on a free TX UART.
+All supported STM32 targets can use MSP + DisplayPort on a free UART.
+HDZero control requires both signal wires: FC TX to VTX RX, FC RX to VTX TX,
+and ground. The firmware sends band/channel and 25/200 mW power settings;
+frequency comes from the native HDZero table. The live MSP status confirms
+communication and queued settings, not RF readback. FlightCodePI uses GP4 TX
+and GP5 RX. Save and reboot to activate the selected UART.
 Boards with a MAX7456/AT7456E chip can also use analog OSD. On the SEQURE H743 V2 target,
 the OSD editor can display battery
 current as a whole-ampere value such as `45 A`, provided the current-sensor
