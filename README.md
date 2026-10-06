@@ -1,6 +1,6 @@
 # FlightCode Configurator
 
-Current release: **1.6.0**.
+Current release: **1.6.1**.
 
 ## FlightCode in action! 🚀
 

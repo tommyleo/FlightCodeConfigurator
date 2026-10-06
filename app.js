@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.6.0",MINIMUM_FIRMWARE_VERSION="1.4.0";
+const CONFIGURATOR_VERSION="1.6.1",MINIMUM_FIRMWARE_VERSION="1.4.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -104,7 +104,7 @@ function updateModeRange(i){
 }
 function setReceiverConfig(config,saved=false){
   receiverConfig={...config,port:config.port||"UART1"};$("#receiverProtocol").value=receiverConfig.protocol||"SBUS";$("#receiverSerialPort").value=receiverConfig.port;$("#receiverChannelOrder").value=receiverConfig.order;updateReceiverProtocolUi();
-  state.activeReceiverProtocol=receiverConfig.protocol||"SBUS";state.activeReceiverPort=receiverConfig.port;
+  state.activeReceiverProtocol=receiverConfig.protocol||"SBUS";state.activeReceiverPort=receiverConfig.port;updateDfuButton();
   config.modes.forEach((mode,i)=>{$(`#modeFunction${i}`).value=mode.fn;$(`#modeChannel${i}`).value=mode.channel;$(`#modeMin${i}`).value=mode.min;$(`#modeMax${i}`).value=mode.max;updateModeRange(i)});
   $("#receiverConfigState").textContent=saved?"Saved to flash":"Unsaved changes";updateReceiverLabels();
 }
@@ -114,10 +114,17 @@ function getReceiverConfig(){
   if(modes.some(m=>m.min>=m.max))throw new Error("Each mode needs a valid minimum and maximum");
   return {protocol:$("#receiverProtocol").value,port:$("#receiverSerialPort").value,order:$("#receiverChannelOrder").value,modes};
 }
-function updateReceiverProtocolUi(){const protocol=$("#receiverProtocol").value;$("#receiverInputType").textContent=`INPUT / ${protocol}`;$("#receiverDiagnosticsType").textContent=`${protocol} DIAGNOSTICS`;$("#sbusDiagnosticMessage").textContent=`Waiting for ${protocol} receiver diagnostics…`}
+function updateReceiverProtocolUi(){updateReceiverBindControls();const protocol=$("#receiverProtocol").value;$("#receiverInputType").textContent=`INPUT / ${protocol}`;$("#receiverDiagnosticsType").textContent=`${protocol} DIAGNOSTICS`;$("#sbusDiagnosticMessage").textContent=`Waiting for ${protocol} receiver diagnostics…`}
+function updateReceiverBindControls(){
+  const elrs=$("#receiverProtocol").value==="ELRS",button=$("#bindReceiverButton");
+  $("#receiverBindRow").hidden=!elrs;
+  const applied=state.activeReceiverProtocol==="ELRS"&&state.activeReceiverPort===$("#receiverSerialPort").value;
+  button.disabled=!elrs||!state.connected||!hasCapability("RECEIVER_BIND")||!applied||state.armed||state.motorTest||pidDiagnostic.running;
+  button.title=!hasCapability("RECEIVER_BIND")?"Update firmware to enable receiver binding":!applied?"Apply the ELRS receiver settings first":"";
+}
 function setReceiverProtocols(protocols,reported=true){state.receiverProtocols=protocols.length?protocols:["SBUS"];state.receiverProtocolsReported=reported;const select=$("#receiverProtocol"),selected=state.receiverProtocols.includes(receiverConfig.protocol)?receiverConfig.protocol:state.receiverProtocols[0];select.replaceChildren(...state.receiverProtocols.map(protocol=>new Option(protocol==="ELRS"?"ELRS (CRSF)":protocol,protocol)));select.value=selected;receiverConfig.protocol=selected;updateReceiverProtocolUi()}
 function setSerialPorts(ports){state.serialPorts=ports.length?ports:["UART1"];[$("#receiverSerialPort"),$("#vtxSerialPort")].forEach(select=>{const selected=select.value,available=state.board==="PICO2_W"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="PIO0":port==="UART1"):state.board==="HUMMINGBIRD_200RS"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="UART1":port!=="UART1"):select.id==="vtxSerialPort"&&state.board==="SEQUREH7V2"?state.serialPorts.filter(port=>port!=="UART8"):state.serialPorts;select.replaceChildren(...available.map(port=>new Option(port,port)));select.value=available.includes(selected)?selected:available[0]});receiverConfig.port=$("#receiverSerialPort").value;vtxConfig.port=$("#vtxSerialPort").value;validateSerialAssignments()}
-function validateSerialAssignments(){
+function validateSerialAssignments(){updateReceiverBindControls();
   const port=$("#vtxSerialPort").value,protocol=$("#vtxProtocol").value;
   const receiverPort=$("#receiverSerialPort").value,receiverProtocol=$("#receiverProtocol").value;
   const conflict=protocol!=="OFF"&&receiverPort===port;
@@ -433,7 +440,7 @@ function applyCapabilities(){
   if(!state.connected){state.imuName="";$("#diagnosticImuName").textContent="IMU —"}
 }
 function sbusBlocksDfu(){return state.signal&&state.activeReceiverProtocol==="SBUS"&&state.activeReceiverPort==="UART1"}
-function updateDfuButton(){const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;button.title=sbusBlocksDfu()?"Turn off the transmitter before entering DFU":"";window.firmwareFlasher?.updateReady?.()}
+function updateDfuButton(){updateReceiverBindControls();const button=$("#enterDfuButton");button.disabled=!state.connected||!hasCapability("DFU")||state.armed||state.motorTest;button.title=sbusBlocksDfu()?"Turn off the transmitter before entering DFU":"";window.firmwareFlasher?.updateReady?.()}
 function updateMainLoopButton(){buttons.applyMainLoop.disabled=!state.connected||!hasCapability("MAIN_LOOP")||!hasCapability("REBOOT")||state.armed||state.motorTest}
 function updateGyroRateOptions(){
   const scheduler=Number($("#mainLoopHz").value)||16000,select=$("#gyroRateHz"),selected=state.gyroRateHz||Number(select.value);
@@ -464,6 +471,9 @@ function setValidationError(viewId,message){
 }
 function boardErrorMessage(parts){
   const code=parts[2];
+  if(code==="BIND_REQUIRES_ELRS")return "Apply ELRS receiver settings before binding";
+  if(code==="BIND_BUSY")return "Stop motor testing or PID simulation before binding";
+  if(code==="BIND_TX_FAILED")return "Could not send the bind command to the receiver";
   if(code==="SBUS_REQUIRES_UART1"||code==="SBUS_REQUIRES_UART5")return `SBUS requires ${code.slice(-5)} on this board`;
   if(code==="ELRS_REQUIRES_UART4")return "ELRS requires UART4 on this board";
   if(code==="UART_RESERVED_FOR_INVERTED_SBUS")return "UART5 is reserved for inverted SBUS; choose another UART";
@@ -783,7 +793,7 @@ function cancelPidDiagnostic(message="PID check cancelled."){
     return;
   }
   if(pidDiagnostic.running)send("PID_SIM_ENABLE 0",false);
-  pidDiagnostic.running=false;
+  pidDiagnostic.running=false;updateReceiverBindControls();
   $("#cancelPidDiagnosticButton").disabled=true;
   $("#startPidDiagnosticButton").disabled=!state.connected||!$("#pidDiagnosticSafety").checked;
   pidDiagnosticUi("Check that the PID correctly opposes movement on all three axes.",message,"warn",0);
@@ -792,7 +802,7 @@ function pidDiagnosticSummary(samples,direction,loopHz,maxLoopPeriodUs){
   return FlightCodeDiagnosticLogic.pidSummary(samples,direction,loopHz,maxLoopPeriodUs);
 }
 function finishPidDiagnostic(){
-  clearInterval(pidDiagnostic.timer);pidDiagnostic.timer=null;pidDiagnostic.running=false;
+  clearInterval(pidDiagnostic.timer);pidDiagnostic.timer=null;pidDiagnostic.running=false;updateReceiverBindControls();
   const direction=$("#motorDirection").value;
   const summary=pidDiagnosticSummary(pidDiagnostic.samples,direction,state.loopHz,state.maxLoopPeriodUs);
   pidDiagnostic.file={format:"FlightCode-PID-Mixer-Diagnostic",version:2,created:new Date().toISOString(),
@@ -810,7 +820,7 @@ async function startPidDiagnostic(){
     showError("Disarm the quad, stop the other tests, and confirm that the propellers are removed");return;
   }
   await send("PID_SIM_ENABLE 1");
-  pidDiagnostic.running=true;pidDiagnostic.stage=-1;pidDiagnostic.samples=[];pidDiagnostic.file=null;pidDiagnostic.aborted=false;pidDiagnostic.abortMessage="";pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.readyAt=0;
+  pidDiagnostic.running=true;updateReceiverBindControls();pidDiagnostic.stage=-1;pidDiagnostic.samples=[];pidDiagnostic.file=null;pidDiagnostic.aborted=false;pidDiagnostic.abortMessage="";pidDiagnostic.detected=false;pidDiagnostic.neutralSince=0;pidDiagnostic.readyAt=0;
   $("#startPidDiagnosticButton").disabled=true;$("#cancelPidDiagnosticButton").disabled=false;$("#downloadPidDiagnosticButton").disabled=true;
   pidDiagnosticUi("Set throttle to zero, then enable the configured ARM switch.","Waiting for arming…","",0);
 }
@@ -1252,6 +1262,10 @@ function line(value){
   if(p[1]==="MOTOR_DIRECTION"){if(["NORMAL","REVERSED"].includes(p[2])){$("#motorDirection").value=p[2];updateMotorDirectionDiagram()}return}
   if(p[1]==="MOTOR_IDLE"){const value=Number(p[2]);if(Number.isFinite(value))$("#motorIdlePercent").value=value.toFixed(1);return}
   if(p[1]==="OK"){
+    if(p[2]==="BIND_RECEIVER"){
+      $("#receiverBindState").textContent="Bind command sent. Select Bind on your radio; check the receiver LED.";
+      toast("Bind command sent");return;
+    }
     if(p[2]==="MOTOR_TEST_ENABLED"){
       state.motorTest=true;setMotorControls(true);clearInterval(state.motorHeartbeat);
       sendMotorTest();state.motorHeartbeat=setInterval(sendMotorTest,100);
@@ -1395,7 +1409,12 @@ buttons.applyMotorIdle.onclick=async()=>{
   if(!Number.isFinite(value)||value<1||value>10){showError("Motor idle: enter a value between 1% and 10%");return}
   await send(`SET_MOTOR_IDLE ${value}`);await send("SAVE_SETTINGS");
 };
-buttons.applyReceiver.onclick=async()=>{try{const config=getReceiverConfig();await send(receiverCommand());state.activeReceiverProtocol=config.protocol;state.activeReceiverPort=config.port;updateDfuButton()}catch(error){showError(error.message)}};
+$("#bindReceiverButton").onclick=async()=>{
+  updateReceiverBindControls();
+  if($("#bindReceiverButton").disabled)return;
+  try{await send("BIND_RECEIVER")}catch(error){showError(error.message,"receiverView")}
+};
+buttons.applyReceiver.onclick=async()=>{try{await send(receiverCommand());updateReceiverBindControls()}catch(error){showError(error.message)}};
 buttons.applyVtx.onclick=async()=>{try{await send(vtxCommand());$("#vtxConfigState").textContent="Applied in RAM · save and reboot"}catch(error){showError(error.message)}};
 function osdCommand(){return `SET_OSD_ENABLED ${$("#osdEnabled").checked?1:0}`}
 function osdLayoutCommand(){const pilot=(osdLayout.pilot||"-").replaceAll(" ","_"),positions=osdLayout.positions.slice(0,6);positions.push(positions[5]);return `SET_OSD_LAYOUT ${osdLayout.mask} ${positions.join(" ")} ${pilot}`}
@@ -1428,7 +1447,7 @@ $("#clearBlackboxButton").onclick=async()=>{
   await send("CLEAR_BLACKBOX");blackbox.flights=[];blackbox.totalBytes=0;$("#blackboxStored").textContent=formatBytes(0);renderBlackboxFlights();$("#blackboxDownloadState").textContent="Flight catalog erased";
   setTimeout(()=>{if(state.connected)send("GET_BLACKBOX_STATUS",false)},250);
 };
-buttons.saveReceiver.onclick=async()=>{try{const config=getReceiverConfig();await send(receiverCommand());await send("SAVE_SETTINGS");state.activeReceiverProtocol=config.protocol;state.activeReceiverPort=config.port;updateDfuButton()}catch(error){showError(error.message)}};
+buttons.saveReceiver.onclick=async()=>{try{await send(receiverCommand());await send("SAVE_SETTINGS");updateReceiverBindControls()}catch(error){showError(error.message)}};
 buttons.saveVtx.onclick=async()=>{try{await send(vtxCommand());await send("SAVE_SETTINGS");$("#vtxConfigState").textContent="Saved to flash · reboot required"}catch(error){showError(error.message)}};
 buttons.applyAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);resetAttitude()}catch(error){showError(error.message)}};
 buttons.saveAlignment.onclick=async()=>{try{await send(`SET_BOARD_ALIGNMENT ${getAlignment().join(" ")}`);await send("SAVE_SETTINGS");resetAttitude()}catch(error){showError(error.message)}};

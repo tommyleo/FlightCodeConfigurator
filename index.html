@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#071016">
-  <title>FlightCode Configurator 1.6.0</title>
+  <title>FlightCode Configurator 1.6.1</title>
   <link rel="stylesheet" href="styles.css?v=20261004-orientation-note">
   <link rel="stylesheet" href="model.css?v=20260819-2">
   <link rel="stylesheet" href="blackbox.css?v=20260819-2">
@@ -14,7 +14,7 @@
   <header class="topbar">
     <div class="brand">
       <img class="brand-logo" src="assets/flightcode-logo.png" alt="FlightCode logo">
-      <div><b>FlightCode</b><small>CONFIGURATOR · v1.6.0</small></div>
+      <div><b>FlightCode</b><small>CONFIGURATOR · v1.6.1</small></div>
     </div>
     <div class="connection"><div id="batteryStatus" class="battery-status disabled" title="Battery voltage not available"><span class="battery-icon"><i id="batteryFill"></i></span><b id="batteryVoltage">— V</b></div><div id="batteryCurrentStatus" class="current-status disabled" title="Board not connected"><b id="batteryCurrent">— A</b></div><i id="connectionDot"></i><span id="connectionText">Board not connected</span>
       <button id="connectButton" class="button primary">Connect</button></div>
@@ -95,6 +95,7 @@
           <div class="receiver-order"><label for="receiverSerialPort"><small>SERIAL PORT</small>Receiver UART</label><select id="receiverSerialPort" data-receiver-config disabled><option value="UART1">UART1</option></select></div>
           <div class="receiver-order"><label for="receiverChannelOrder"><small>CHANNEL MAP</small>First four channels</label><select id="receiverChannelOrder" data-receiver-config disabled><option>TAER1234</option><option>AETR1234</option></select></div>
           <div id="receiverModes" class="receiver-modes"></div>
+          <div id="receiverBindRow" class="receiver-actions" hidden><span id="receiverBindState">Requires ELRS 3.4+ and FC TX connected to receiver RX. Then select Bind on your radio.</span><button id="bindReceiverButton" class="button secondary" disabled>Bind receiver</button></div>
           <div class="receiver-actions"><span id="receiverConfigState">Waiting for board settings</span><button id="applyReceiverConfigButton" class="button secondary" disabled>Apply</button><button id="saveReceiverConfigButton" class="button primary" disabled>Save</button></div>
         </article>
         <article id="sbusDiagnostics" class="sbus-diagnostics waiting">
