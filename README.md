@@ -90,7 +90,7 @@ firmware rejects configuration changes while the flight controller is armed.
 On `FLYWOOF405NANO` and `HDZERO_HALO`, the Camera OSD tab controls the MSP
 DisplayPort overlay using an HDZero-compatible 30 × 16 canvas centered in the
 HD display. The VTX tab selects `HDZERO_MSP` and the connected UART; Flywoo HD
-defaults to UART6 and Halo defaults to UART5 on a fresh firmware configuration.
+defaults to UART4 (UART6 is reserved for integrated ELRS) and Halo defaults to UART5 on a fresh firmware configuration.
 All supported STM32 targets can use MSP + DisplayPort on a free UART.
 HDZero control requires both signal wires: FC TX to VTX RX, FC RX to VTX TX,
 and ground. The firmware sends band/channel and 25/200 mW power settings;
