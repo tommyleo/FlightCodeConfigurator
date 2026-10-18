@@ -6,12 +6,20 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Insets;
+import android.graphics.Color;
+import android.view.WindowInsets;
+import android.widget.FrameLayout;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.net.Uri;
+import android.webkit.ValueCallback;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Base64;
@@ -29,6 +37,10 @@ public final class MainActivity extends Activity {
     private static final String USB_PERMISSION = "com.flightcode.configurator.USB_PERMISSION";
     private WebView webView;
     private AndroidUsbBridge usbBridge;
+    private static final int BACKUP_SAVE_REQUEST = 701;
+    private static final int BACKUP_OPEN_REQUEST = 702;
+    private String pendingBackup;
+    private ValueCallback<Uri[]> fileChooser;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -39,14 +51,116 @@ public final class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                                                       WebChromeClient.FileChooserParams params) {
+                if (fileChooser != null) fileChooser.onReceiveValue(null);
+                fileChooser = callback;
+                try {
+                    startActivityForResult(params.createIntent(), BACKUP_OPEN_REQUEST);
+                } catch (Exception error) {
+                    fileChooser.onReceiveValue(null);
+                    fileChooser = null;
+                }
+                return true;
+            }
+        });
+        webView.addJavascriptInterface(new BackupFilesBridge(), "AndroidBackupFiles");
         usbBridge = new AndroidUsbBridge(this, webView);
         webView.addJavascriptInterface(usbBridge, "AndroidUsb");
-        setContentView(webView);
+        // Resize the WebView so fixed headers and footers stay inside the safe area.
+        FrameLayout content = new FrameLayout(this);
+        content.setBackgroundColor(Color.rgb(7, 16, 24));
+        content.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().setDecorFitsSystemWindows(false);
+        }
+        content.setOnApplyWindowInsetsListener((view, insets) -> {
+            if (Build.VERSION.SDK_INT >= 30) {
+                int handledTypes = WindowInsets.Type.systemBars()
+                        | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime();
+                Insets safe = insets.getInsets(handledTypes);
+                view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+                // Prevent the WebView from applying the same insets a second time.
+                return new WindowInsets.Builder(insets)
+                        .setInsets(handledTypes, Insets.NONE).build();
+            }
+            int left = insets.getSystemWindowInsetLeft();
+            int top = insets.getSystemWindowInsetTop();
+            int right = insets.getSystemWindowInsetRight();
+            int bottom = insets.getSystemWindowInsetBottom();
+            if (Build.VERSION.SDK_INT >= 28 && insets.getDisplayCutout() != null) {
+                android.view.DisplayCutout cutout = insets.getDisplayCutout();
+                left = Math.max(left, cutout.getSafeInsetLeft());
+                top = Math.max(top, cutout.getSafeInsetTop());
+                right = Math.max(right, cutout.getSafeInsetRight());
+                bottom = Math.max(bottom, cutout.getSafeInsetBottom());
+            }
+            view.setPadding(left, top, right, bottom);
+            WindowInsets remaining = insets.consumeSystemWindowInsets();
+            return Build.VERSION.SDK_INT >= 28 ? remaining.consumeDisplayCutout() : remaining;
+        });
+        setContentView(content);
+        content.requestApplyInsets();
         webView.loadUrl("file:///android_asset/configurator/index.html?platform=android");
     }
 
+    public final class BackupFilesBridge {
+        @JavascriptInterface public void saveBackup(String filename, String json) {
+            if (json == null || json.length() > 32768 || filename == null) return;
+            runOnUiThread(() -> {
+                if (pendingBackup != null) {
+                    backupFileSaved(false, "A file save is already open");
+                    return;
+                }
+                pendingBackup = json;
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                intent.putExtra(Intent.EXTRA_TITLE, filename);
+                try { startActivityForResult(intent, BACKUP_SAVE_REQUEST); }
+                catch (Exception error) {
+                    pendingBackup = null;
+                    backupFileSaved(false, "Could not open the Android file picker");
+                }
+            });
+        }
+    }
+
+    private void backupFileSaved(boolean saved, String message) {
+        webView.evaluateJavascript("window.FlightCodeBackupFileSaved&&window.FlightCodeBackupFileSaved("
+                + saved + "," + JSONObject.quote(message) + ")", null);
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == BACKUP_OPEN_REQUEST) {
+            if (fileChooser != null) {
+                fileChooser.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+                fileChooser = null;
+            }
+        } else if (requestCode == BACKUP_SAVE_REQUEST) {
+            String json = pendingBackup;
+            pendingBackup = null;
+            if (resultCode != RESULT_OK || data == null || data.getData() == null || json == null) {
+                backupFileSaved(false, "Backup save cancelled; no file was saved");
+                return;
+            }
+            try (OutputStream output = getContentResolver().openOutputStream(data.getData(), "wt")) {
+                if (output == null) throw new java.io.IOException("Cannot open the selected file");
+                output.write(json.getBytes(StandardCharsets.UTF_8));
+                output.flush();
+            } catch (Exception error) {
+                backupFileSaved(false, "Could not write the selected backup file");
+                return;
+            }
+            backupFileSaved(true, "Backup saved");
+        }
+    }
+
     @Override public void onDestroy() {
+        if (fileChooser != null) { fileChooser.onReceiveValue(null); fileChooser = null; }
         usbBridge.shutdown();
         webView.destroy();
         super.onDestroy();

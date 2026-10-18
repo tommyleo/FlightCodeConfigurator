@@ -130,3 +130,7 @@
 #setupView>.heading{margin-bottom:12px}.orientation-note{margin:0 0 24px;color:var(--muted);font-size:12px;line-height:1.6}
 
 #receiverBindRow[hidden]{display:none}
+
+.configuration-backup{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 20px;margin-bottom:24px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.configuration-backup strong{font-size:14px}.configuration-backup p{margin:7px 0;color:var(--muted);font-size:12px}.configuration-backup small{color:var(--muted);font-size:11px}.configuration-backup-actions{display:flex;gap:8px;flex-shrink:0}
+@media(max-width:700px){.configuration-backup{align-items:stretch;flex-direction:column;padding:16px}.configuration-backup-actions .button{flex:1;min-height:44px}}

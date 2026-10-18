@@ -190,3 +190,20 @@ boards reporting `BATTERY_CURRENT`. A missing sensor or disconnected board shows
 
 On SEQURE H7 with diagnostic firmware, hover over current to see sensor voltage,
 sample count, sample age and conversion errors. Stale ADC samples show — A.
+
+
+## Complete configuration backup
+
+The two controls above the configuration tabs are **Save backup** and **Load backup**. They work with FlightCode and FlightCodePI on every supported target after installing firmware advertising `SETTINGS_BACKUP`. Older firmware is detected and the controls explain that an update is needed; the Configurator never labels an incomplete export as a full backup.
+
+Save backup reads a consistent snapshot of the entire board settings structure directly from the firmware, including fields not currently visible or associated with unpowered peripherals. It downloads a JSON file containing board model, firmware family/version, settings layout version, payload length, a CRC32 checksum and the complete byte-exact settings payload. Local edits that have not been applied to the board are not included. Flight logs, ESC firmware/settings and transient gyro calibration are separate from the FC settings backup.
+
+Load backup validates the complete file, board model, firmware family and settings layout before sending it. The firmware stages all chunks without changing active settings, verifies their order and CRC, then validates and saves the settings. The Configurator reads the entire result back before reporting success. Disconnects, timeouts, malformed files and incompatible boards stop the operation. If flash saving fails, the firmware restores the previous settings in RAM and reports failure; this is not a guarantee that a failed flash write preserved the previous persistent record. After a successful read-back verification, the Configurator automatically reboots the FC so all peripherals use the restored configuration. Reconnect when its USB port returns. Failed restores do not trigger a reboot.
+
+Android uses the system file picker for both operations and does not request broad storage access. Desktop/web use the standard download and file selector.
+
+Before trying Betaflight: first update the Configurator and the same FlightCode target using the Configurator Firmware tab, which preserves the reserved settings sectors; the backup update does not change the existing settings structure, version or storage address. Reconnect, save the backup file and keep it. After reinstalling compatible FlightCode on that same target, load the file; the Configurator verifies it and reboots the board automatically. These JSON files cannot be imported into Betaflight. Do not use full-chip erase when the goal is to preserve the existing settings before the first backup.
+
+Validation: `node --test tests/*.test.js tests/*.cjs` includes full transactions for all current FlightCode targets and FlightCodePI, corrupt files, wrong board/schema, disconnects, timeouts and read-back comparison. Firmware protocol regression: compile `tests/settings_backup_test.c` with `-Isrc/protocol` in the FlightCode repository.
+
+Backup read resilience (2026-10-18): GET_SETTINGS_INFO and GET_SETTINGS_CHUNK may retry up to three times if a response times out. Disconnects and explicit firmware errors stop immediately. Restore begin/chunk/commit commands are never retried automatically. Index script URLs were changed so reloading picks up the updated client. On the real SEQURE H7, direct settings queries and a complete read-only browser backup succeeded; the reported restore-preflight timeout was not reproduced in that probe. A firmware capability-line truncation was observed on the device and fixed separately. No settings or firmware were written during the read-only diagnosis.

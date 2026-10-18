@@ -83,6 +83,62 @@ for(let i=0;i<4;i++){
   test.innerHTML=`<div><strong>M${i+1}</strong><small>${motorPositions[i]}</small></div><input id="motorTestSlider${i}" class="vertical-motor" type="range" min="0" max="100" step="1" value="0" disabled><output id="motorTestValue${i}">0%</output>`;
   $("#motorTestGrid").append(test);
 }
+// Backup uses the firmware settings snapshot, never values inferred from controls.
+let configurationBackupFileSaving=false;
+const configurationBackupClient=FlightCodeConfigurationBackup.createClient({
+  send:command=>send(command,false),
+  isSafe:()=>state.connected&&!!state.writer&&hasCapability('SETTINGS_BACKUP')&&!state.armed&&!state.motorTest&&!pidDiagnostic.running&&!blackbox.downloading,
+  identity:()=>({board:state.board,firmwareVersion:state.firmwareVersion,configuratorVersion:CONFIGURATOR_VERSION}),
+  onProgress:message=>{$('#configurationBackupState').textContent=message},
+  onBusy:busy=>{document.querySelectorAll('main>.view,aside .nav,.console').forEach(element=>{element.inert=busy});updateConfigurationBackupControls()}
+});
+function updateConfigurationBackupControls(){
+  const supported=state.connected&&hasCapability('SETTINGS_BACKUP');
+  const blocked=!supported||configurationBackupFileSaving||configurationBackupClient.busy||state.armed||state.motorTest||pidDiagnostic.running||blackbox.downloading;
+  $('#backupConfigurationButton').disabled=blocked;$('#restoreConfigurationButton').disabled=blocked;
+  if(!configurationBackupClient.busy&&!supported)$('#configurationBackupState').textContent=state.connected?'Update the board firmware to enable complete settings backup':'Connect a board to save or load its settings';
+}
+async function saveConfigurationBackupFile(file){
+  const name=`${file.family}-${file.board}-settings-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,json=JSON.stringify(file,null,2);
+  if(globalThis.AndroidBackupFiles?.saveBackup){
+    return await new Promise((resolve,reject)=>{
+      globalThis.FlightCodeBackupFileSaved=(saved,message)=>{delete globalThis.FlightCodeBackupFileSaved;saved?resolve():reject(Error(message||'Backup was not saved'))};
+      try{AndroidBackupFiles.saveBackup(name,json)}catch(error){delete globalThis.FlightCodeBackupFileSaved;reject(error)}
+    });
+  }
+  const url=URL.createObjectURL(new Blob([json],{type:'application/json'})),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+$('#backupConfigurationButton').onclick=async()=>{
+  try{
+    const file=await configurationBackupClient.backup();
+    configurationBackupFileSaving=true;updateConfigurationBackupControls();
+    await saveConfigurationBackupFile(file);
+    $('#configurationBackupState').textContent='Complete backup file created · keep it before changing firmware';toast('Configuration backup saved');
+  }catch(error){$('#configurationBackupState').textContent=error.message;showError(error.message)}
+  finally{configurationBackupFileSaving=false;updateConfigurationBackupControls()}
+};
+$('#restoreConfigurationButton').onclick=()=>{$('#configurationBackupFile').value='';$('#configurationBackupFile').click()};
+$('#configurationBackupFile').onchange=async event=>{
+  const selected=event.target.files?.[0];if(!selected)return;
+  try{
+    if(selected.size>32768)throw Error('Backup file is too large');
+    const text=await selected.text(),file=FlightCodeConfigurationBackup.parse(text);
+    if(file.board!==state.board)throw Error(`This backup belongs to ${file.board}; connect that board to load it`);
+    if(!confirm(`Load all settings for ${file.board} from this backup?\nCreated: ${file.createdAt||'unknown'}\nThe current settings will be replaced, saved and verified. The board will then reboot automatically.`))return;
+    await configurationBackupClient.restore(text);
+    state.osdDirty=false;state.blackboxDirty=false;
+    $('#configurationBackupState').textContent='All settings restored, saved and verified · rebooting the board…';
+    try{
+      if(!state.connected||!state.writer)throw Error('Board disconnected');
+      await send('REBOOT',false);
+    }catch(error){throw Error(`All settings were restored and verified, but automatic reboot failed: ${error.message}. Restart the board manually`)}
+    toast('Configuration restored · board restarting. Reconnect when USB returns');
+  }catch(error){$('#configurationBackupState').textContent=error.message;showError(error.message)}
+};
+updateConfigurationBackupControls();
+
+
 const buttons={connect:$("#connectButton"),read:$("#readButton"),apply:$("#applyButton"),save:$("#saveButton"),reset:$("#resetButton")};
 buttons.applyProtocol=$("#applyProtocolButton");
 buttons.applyMainLoop=$("#applyMainLoopButton");
@@ -406,6 +462,7 @@ function updateMotorDirectionDiagram(){
 $("#motorDirection").onchange=updateMotorDirectionDiagram;
 updateMotorDirectionDiagram();
 function applyCapabilities(){
+  updateConfigurationBackupControls();
   setCapabilityControls("[data-pid]","PIDS");
   setCapabilityControls("[data-rate]","RATES");
   setCapabilityControls("[data-feedforward]","FEEDFORWARD");
@@ -543,6 +600,8 @@ function clearOfflineBoardValues(){
 }
 function connected(value){
   if(!value)clearPidRead();
+  if(!value)configurationBackupClient.cancel();
+  queueMicrotask(updateConfigurationBackupControls);
   state.connected=value;$("#connectionDot").classList.toggle("online",value);$("#deviceDot").classList.toggle("online",value);
   updateConnectionText();buttons.connect.textContent=value?"Disconnect":"Connect";
   document.querySelectorAll("[data-pid]").forEach(i=>i.disabled=!value);[buttons.read,buttons.apply,buttons.save,buttons.reset].forEach(b=>b.disabled=!value);
@@ -579,7 +638,9 @@ function log(line,direction="RX"){
   const out=$("#consoleOutput");if(!state.count)out.textContent="";out.textContent+=`${new Date().toLocaleTimeString()}  ${direction}  ${line}\n`;out.scrollTop=out.scrollHeight;
   $("#messageCount").textContent=`${++state.count} messages`;
 }
-async function send(command,visible=true){if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
+async function send(command,visible=true){
+  if(configurationBackupClient.busy&&!/^(GET_|RESTORE_SETTINGS_|PING$|BYE$)/.test(command))throw new Error("Wait for the configuration backup operation to finish");
+  if(!state.writer)return;if(visible)log(command,"TX");await state.writer.write(new TextEncoder().encode(`${command}\n`))}
 async function enterDfuMode(){
   if(!state.connected||!hasCapability("DFU")||state.armed||state.motorTest)throw new Error("Bootloader restart requires a connected, disarmed board with motor test disabled");
   if(sbusBlocksDfu())throw new Error("Active SBUS signal detected on UART1. Turn off the transmitter before entering DFU.");
@@ -937,6 +998,7 @@ function finishFlightLogDownload(){
   $("#flightLogProgress").style.width="100%";updateFlightLogUi();toast("Flight log downloaded");
 }
 function telemetry(parts){
+  queueMicrotask(updateConfigurationBackupControls);
   if(parts.length<32)return;const timestamp=Number(parts[2]),signal=parts[3]==="1",armed=parts[4]==="1";
   const calibrated=parts[32]==="1";
   const wasArmed=state.armed,wasCalibrated=state.calibrated,wasSignal=state.signal,firstTelemetry=!state.telemetrySeen;
@@ -1034,6 +1096,7 @@ function setAlignment(values){$("#boardRoll").value=Number(values[0]).toFixed(1)
 function getAlignment(){return ["boardRoll","boardPitch","boardYaw"].map(id=>{const value=Number($(`#${id}`).value);if(!Number.isFinite(value)||value < -180||value > 180)throw new Error("Angles must be between -180° and +180°");return value})}
 function line(value){
   log(value);if(!state.connected||!value.startsWith("@CFG "))return;const p=value.trim().split(/\s+/);
+  configurationBackupClient.handleLine(p);
   if(blackbox.downloading&&["TELEMETRY","BATTERY_VOLTAGE","BATTERY_CURRENT","SBUS_DIAGNOSTICS"].includes(p[1]))return;
   if(p[1]==="TELEMETRY"){telemetry(p);return}
   if(p[1]==="BATTERY_VOLTAGE"){updateBattery(Number(p[2]));return}

@@ -10,6 +10,7 @@ $publishFiles = @(
     "blackbox.css",
     "firmware-flasher.css",
     "app.js",
+    "configuration-backup.js",
     "attitude-logic.js",
     "blackbox-logic.js",
     "diagnostic-logic.js",
