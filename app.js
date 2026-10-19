@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.6.3",MINIMUM_FIRMWARE_VERSION="1.4.0";
+const CONFIGURATOR_VERSION="1.6.4",MINIMUM_FIRMWARE_VERSION="1.4.0";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -179,7 +179,7 @@ function updateReceiverBindControls(){
   button.title=!hasCapability("RECEIVER_BIND")?"Update firmware to enable receiver binding":!applied?"Apply the ELRS receiver settings first":"";
 }
 function setReceiverProtocols(protocols,reported=true){state.receiverProtocols=protocols.length?protocols:["SBUS"];state.receiverProtocolsReported=reported;const select=$("#receiverProtocol"),selected=state.receiverProtocols.includes(receiverConfig.protocol)?receiverConfig.protocol:state.receiverProtocols[0];select.replaceChildren(...state.receiverProtocols.map(protocol=>new Option(protocol==="ELRS"?"ELRS (CRSF)":protocol,protocol)));select.value=selected;receiverConfig.protocol=selected;updateReceiverProtocolUi()}
-function setSerialPorts(ports){state.serialPorts=ports.length?ports:["UART1"];[$("#receiverSerialPort"),$("#vtxSerialPort")].forEach(select=>{const selected=select.value,available=state.board==="PICO2_W"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="PIO0":port==="UART1"):state.board==="HUMMINGBIRD_200RS"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="UART1":port!=="UART1"):select.id==="vtxSerialPort"&&state.board==="SEQUREH7V2"?state.serialPorts.filter(port=>port!=="UART8"):state.serialPorts;select.replaceChildren(...available.map(port=>new Option(port,port)));select.value=available.includes(selected)?selected:available[0]});receiverConfig.port=$("#receiverSerialPort").value;vtxConfig.port=$("#vtxSerialPort").value;validateSerialAssignments()}
+function setSerialPorts(ports){state.serialPorts=ports.length?ports:["UART1"];[$("#receiverSerialPort"),$("#vtxSerialPort")].forEach(select=>{const selected=select.value,available=state.board==="PICO2_W"&&state.serialPorts.includes("PIO0")?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="PIO0":port==="UART1"):state.board==="HUMMINGBIRD_200RS"?state.serialPorts.filter(port=>select.id==="receiverSerialPort"?port==="UART1":port!=="UART1"):select.id==="vtxSerialPort"&&state.board==="SEQUREH7V2"?state.serialPorts.filter(port=>port!=="UART8"):state.serialPorts;select.replaceChildren(...available.map(port=>new Option(port,port)));select.value=available.includes(selected)?selected:available[0]});receiverConfig.port=$("#receiverSerialPort").value;vtxConfig.port=$("#vtxSerialPort").value;validateSerialAssignments()}
 function validateSerialAssignments(){updateReceiverBindControls();
   const port=$("#vtxSerialPort").value,protocol=$("#vtxProtocol").value;
   const receiverPort=$("#receiverSerialPort").value,receiverProtocol=$("#receiverProtocol").value;
@@ -188,7 +188,7 @@ function validateSerialAssignments(){updateReceiverBindControls();
   const invertedSbusPort=flywoo&&protocol!=="OFF"&&port==="UART5";
   const elrsPort=state.board==="FLYWOOF405NANO"?"UART6":"UART4";
   const receiverPortInvalid=(flywoo||state.board==="CLRACINGF4")&&(receiverProtocol==="ELRS"?receiverPort!==elrsPort:receiverPort!==(flywoo?"UART5":"UART1"));
-  const supported={MAMBAF411:["UART1","UART2"],CLRACINGF4:["UART1","UART3","UART4","UART6"],FLYWOOF405NANO:["UART4"],FLYWOOF405NANO_ANALOG:["UART4","UART6"],HDZERO_HALO:protocol==="HDZERO_MSP"?["UART1","UART2","UART4","UART5"]:["UART1","UART2","UART4"],SEQUREH7V2:["UART1","UART2","UART4","UART6","UART7"],FOXEERF722V4:["UART1","UART2","UART3","UART4","UART5","UART6"],FOXEERH743:["UART1","UART2","UART3","UART4","UART6","UART7","UART8"],HUMMINGBIRD_200RS:["UART5","UART7"],PICO2_W:["UART1"]};
+  const supported={MAMBAF411:["UART1","UART2"],CLRACINGF4:["UART1","UART3","UART4","UART6"],FLYWOOF405NANO:["UART4"],FLYWOOF405NANO_ANALOG:["UART4","UART6"],HDZERO_HALO:protocol==="HDZERO_MSP"?["UART1","UART2","UART4","UART5"]:["UART1","UART2","UART4"],SEQUREH7V2:["UART1","UART2","UART4","UART6","UART7"],FOXEERF722V4:["UART1","UART2","UART3","UART4","UART5","UART6"],FOXEERH743:["UART1","UART2","UART3","UART4","UART6","UART7","UART8"],HUMMINGBIRD_200RS:["UART5","UART7"],PICO2_W:(state.serialPorts||[]).includes("PIO0")?["UART1"]:["UART1","UART2"]};
   const unavailable=protocol!=="OFF"&&!(supported[state.board]||[]).includes(port);
   const unsupportedProtocol=state.board==="PICO2_W"&&protocol!=="OFF"&&protocol!=="HDZERO_MSP";
   const usable=state.connected&&hasCapability("VTX_CONFIG"),hdzero=protocol==="HDZERO_MSP";
@@ -204,9 +204,9 @@ function validateSerialAssignments(){updateReceiverBindControls();
   const power=$("#vtxPower"),selectedPower=Number(power.value),powers=hdzero?[25,200]:protocol==="SMARTAUDIO"?[25,100,200,400,500,600,800,1000]:[25,100,200,400,500,600,1000];
   power.replaceChildren(...powers.map(value=>new Option(`${value} mW`,value)));
   power.value=powers.includes(selectedPower)?selectedPower:powers[0];
-  buttons.applyReceiver.disabled=!state.connected||!hasCapability("RECEIVER_CONFIG")||receiverPortInvalid;
+  buttons.applyReceiver.disabled=!state.connected||!hasCapability("RECEIVER_CONFIG")||receiverPortInvalid||(state.board==="PICO2_W"&&conflict);
   buttons.saveReceiver.disabled=buttons.applyReceiver.disabled;
-  const receiverError=!state.connected?"":receiverPortInvalid?(receiverProtocol==="ELRS"?(flywoo&&receiverPort==="UART5"?`UART5 is reserved for inverted SBUS; use ${elrsPort} for ELRS`:`ELRS requires ${elrsPort} on this board`):`SBUS requires ${flywoo?"UART5":"UART1"} on this board`):"";
+  const receiverError=!state.connected?"":state.board==="PICO2_W"&&conflict?"UART already assigned to VTX; disable VTX before changing the receiver UART":receiverPortInvalid?(receiverProtocol==="ELRS"?(flywoo&&receiverPort==="UART5"?`UART5 is reserved for inverted SBUS; use ${elrsPort} for ELRS`:`ELRS requires ${elrsPort} on this board`):`SBUS requires ${flywoo?"UART5":"UART1"} on this board`):"";
   setValidationError("receiverView",receiverError);
   if(receiverError)$("#receiverConfigState").textContent="Invalid receiver UART";
   else if($("#receiverConfigState").textContent==="Invalid receiver UART")$("#receiverConfigState").textContent="Unsaved changes";

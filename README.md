@@ -1,6 +1,6 @@
 # FlightCode Configurator
 
-Current release: **1.6.2**.
+Current development version: **1.6.4** (not released).
 
 ## FlightCode in action! 🚀
 
@@ -207,3 +207,20 @@ Before trying Betaflight: first update the Configurator and the same FlightCode 
 Validation: `node --test tests/*.test.js tests/*.cjs` includes full transactions for all current FlightCode targets and FlightCodePI, corrupt files, wrong board/schema, disconnects, timeouts and read-back comparison. Firmware protocol regression: compile `tests/settings_backup_test.c` with `-Isrc/protocol` in the FlightCode repository.
 
 Backup read resilience (2026-10-18): GET_SETTINGS_INFO and GET_SETTINGS_CHUNK may retry up to three times if a response times out. Disconnects and explicit firmware errors stop immediately. Restore begin/chunk/commit commands are never retried automatically. Index script URLs were changed so reloading picks up the updated client. On the real SEQURE H7, direct settings queries and a complete read-only browser backup succeeded; the reported restore-preflight timeout was not reproduced in that probe. A firmware capability-line truncation was observed on the device and fixed separately. No settings or firmware were written during the read-only diagnosis.
+
+## Pico 2 / Pico 2 W serial assignments (development firmware 1.6.4)
+
+The Pico reports logical ports **UART1** (GP0/GP1) and **UART2** (GP2/GP3).
+Both selectors offer both ports: assign the receiver and VTX to different ports.
+Defaults are receiver UART1 and VTX UART2. These logical names do not identify
+the RP2350 hardware UART instances; the receiver uses PIO. Older Pico firmware
+reporting PIO0/UART1 retains its fixed assignments in the Configurator.
+
+| Function | UART1 | UART2 |
+|---|---|---|
+| Receiver | GP0 RX, GP1 TX (bind only) | GP2 RX, GP3 TX (bind only) |
+| VTX / MSP DisplayPort | GP0 TX, GP1 RX | GP2 TX, GP3 RX |
+
+To swap assignments, disable VTX and apply, select and apply the receiver port,
+then select the other VTX port and re-enable/apply VTX. Save both settings.
+Rewire with power disconnected: TX/RX directions depend on the selected function.
