@@ -21,9 +21,20 @@ for(const port of ['UART1','UART2']){
  assert.equal(buttons.applyReceiver.disabled,false);assert.equal(buttons.applyVtx.disabled,false);
  $('#vtxProtocol').value='HDZERO_MSP';
 }
+$('#vtxProtocol').value='TRAMP';
+for(const [rx,tx] of [['UART1','UART2'],['UART2','UART1']]){
+ $('#receiverSerialPort').value=rx;$('#vtxSerialPort').value=tx;ctx.validateSerialAssignments();
+ assert.equal(buttons.applyVtx.disabled,false);
+}
+$('#receiverSerialPort').value='UART1';ctx.validateSerialAssignments();
+assert.equal(buttons.applyVtx.disabled,true);
+$('#vtxProtocol').value='SMARTAUDIO';ctx.validateSerialAssignments();
+assert.equal(buttons.applyVtx.disabled,true);
+$('#vtxProtocol').value='HDZERO_MSP';
 ctx.setSerialPorts(['PIO0','UART1']);
 assert.deepEqual($('#receiverSerialPort').options.map(o=>o.value),['PIO0']);
 assert.deepEqual($('#vtxSerialPort').options.map(o=>o.value),['UART1']);
 ctx.validateSerialAssignments();assert.equal(buttons.applyVtx.disabled,false);
+$('#vtxProtocol').value='TRAMP';ctx.validateSerialAssignments();assert.equal(buttons.applyVtx.disabled,true);
 assert.equal(fs.readFileSync('android/app/src/main/assets/configurator/app.js','utf8'),source);
 console.log('Pico selectable ports, both assignments, conflict guards, VTX-off swap, legacy firmware and Android parity: PASS');
