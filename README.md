@@ -6,27 +6,18 @@ Current development version: **1.6.4** (not released).
 
 **[Watch the flight video on YouTube](https://youtu.be/JjHND97abkM)**
 
-Shared Web Serial configurator for FlightCode firmware on STM32F4/F7/H7, AT32F435 and
-FlightCodePI on Raspberry Pi Pico 2 W. Protocol v3 automatically detects the
-available features and adapts the interface to the connected board.
+Shared Web Serial configurator for FlightCode and FlightCodePI firmware.
+Protocol v3 automatically detects the available features and adapts the
+interface to the connected flight controller.
 
 ## Firmware projects
 
-- **[FlightCode](https://github.com/tommyleo/FlightCode)** — firmware for
-  supported STM32 and AT32 flight controllers, including analog and HD targets,
-  microSD or internal-flash Blackbox where available, OSD, receiver setup,
-  diagnostics, and STM32 / AT32 DFU flashing.
-- **[FlightCodePI](https://github.com/tommyleo/FlightCodePI)** — firmware for
-  Raspberry Pi Pico 2 and Pico 2 W boards, with SBUS, DSHOT, configurable flight
-  control, protected diagnostics, onboard flight logs, and RP2350 UF2 flashing.
+- **[FlightCode](https://github.com/tommyleo/FlightCode)**
+- **[FlightCodePI](https://github.com/tommyleo/FlightCodePI)**
 
-Choose the firmware repository that matches the flight-controller processor;
-both projects use this Configurator and the same capability-driven interface.
-
-FlightCodePI exposes every configurator feature: PID settings, rates/expo,
-feedforward, TPA, gyroscope and D-term filters, alignment, motor protocol and
-idle, calibration, protected PID diagnostics, flight logs, and USB BOOTSEL
-mode.
+Refer to the firmware repositories for supported boards, hardware features,
+wiring and target-specific instructions. Both projects use this Configurator
+and the same capability-driven interface.
 
 1. Build and flash the appropriate FlightCode or FlightCodePI firmware.
 2. Restart the flight controller normally without holding BOOT.
@@ -87,57 +78,8 @@ while motor output and timed system tasks follow the main scheduler.
 It can read, apply, and persist all supported flight settings. For safety, the
 firmware rejects configuration changes while the flight controller is armed.
 
-On `FLYWOOF405NANO` and `HDZERO_HALO`, the Camera OSD tab controls the MSP
-DisplayPort overlay using an HDZero-compatible 30 × 16 canvas centered in the
-HD display. The VTX tab selects `HDZERO_MSP` and the connected UART; Flywoo HD
-defaults to UART4 (UART6 is reserved for integrated ELRS) and Halo defaults to UART5 on a fresh firmware configuration.
-All supported STM32 targets can use MSP + DisplayPort on a free UART.
-HDZero control requires both signal wires: FC TX to VTX RX, FC RX to VTX TX,
-and ground. The firmware sends band/channel and 25/200 mW power settings;
-frequency comes from the native HDZero table. The live MSP status confirms
-communication and queued settings, not RF readback. FlightCodePI uses GP4 TX
-and GP5 RX. Save and reboot to activate the selected UART.
-Boards with a MAX7456/AT7456E chip can also use analog OSD. On the SEQURE H743 V2 target,
-the OSD editor can display battery
-current as a whole-ampere value such as `45 A`, provided the current-sensor
-input has been connected and calibrated. The board target has compiled but
-has not yet been validated on physical hardware.
-
-On CLRACINGF4, the Blackbox page lists microSD flights retained across power
-cycles. On both Flywoo Nano targets it manages the internal 16 MiB flash and
-its latest retained flight. These targets download indexed flights as FlightCode JSON logs
-and provide a protected catalog-clear action. FlightCodePI does not expose
-persistent Blackbox storage.
-
-## Board feature matrix
-
 The interface is capability-driven: unsupported pages and controls are hidden
 or disabled after connection.
-
-| Configurator feature | MAMBAF411 | CLRACINGF4 | FLYWOOF405NANO | FLYWOOF405NANO_ANALOG | FlightCodePI |
-| --- | --- | --- | --- | --- | --- |
-| PID, rates, expo, FF, TPA | Yes | Yes | Yes | Yes | Yes |
-| Balanced/Racing/Freestyle profiles | Yes | Yes | Yes | Yes | Yes |
-| Gyro and D-term filters | Yes | Yes | Yes | Yes | Yes |
-| Board alignment and live attitude | Yes | Yes | Yes | Yes | Yes |
-| SBUS channel view and receiver setup | Yes | Yes | Yes | Yes | Firmware dependent |
-| Motor protocol, direction, idle and test | Yes | Yes | Yes | Yes | Yes |
-| Guided IMU calibration | Yes | Yes | Yes | Yes | Yes |
-| Guided PID/mixer simulation | Yes | Yes | Yes | Yes | Yes |
-| Battery voltage telemetry | Yes | Yes | Yes | Yes | Yes |
-| OSD layout editor | Analog / MSP DisplayPort | Analog / MSP DisplayPort | MSP DisplayPort, 30 × 16 centered | Analog / MSP DisplayPort | Firmware dependent |
-| RAM flight-log download | Yes | Yes | Yes | Yes | Yes |
-| Persistent Blackbox | No | microSD, multiple-flight catalog | 16 MiB internal flash, latest flight | 16 MiB internal flash, latest flight | No |
-| Blackbox write/session diagnostics | No | Storage status | Yes | Yes | No |
-| Firmware update | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | STM32 DFU/HEX | RP2350 BOOTSEL/UF2 |
-
-On CLRACINGF4, both Flywoo Nano targets and FlightCodePI, Setup exposes a persistent VBAT multiplier
-for final voltage calibration. The firmware uses a nominal 11:1 voltage-divider ratio, while the multiplier defaults to 1.000.
-
-The Flywoo Blackbox page exposes flash readiness, used bytes, dropped records,
-the retained-flight catalog, JSON download, erase, physical **Write test** and
-synthetic **Session test**. Failures include the operation, status register and
-flash address so storage faults can be diagnosed without flying.
 
 ## Available configuration and diagnostics
 
@@ -158,9 +100,8 @@ flash address so storage faults can be diagnosed without flying.
 The **Firmware** tab detects the connected board and selects its matching
 bootloader and firmware format:
 
-- MAMBAF411, CLRACINGF4, FLYWOOF405NANO, FLYWOOF405NANO_ANALOG, and SEQUREH7V2 use STM32 DFU with a matching
-  FlightCode `.hex` file.
-- Raspberry Pi Pico 2 W uses RP2350 Picoboot with a FlightCodePI `.uf2` file.
+- FlightCode uses DFU with a matching `.hex` file.
+- FlightCodePI uses Picoboot with a matching `.uf2` file.
 
 Both paths run directly from Chrome or Edge through WebUSB:
 
@@ -174,23 +115,9 @@ application memory, verifies every programmed byte, and then restarts the
 flight controller. Reserved settings and flight-log storage are preserved. On
 success, the Firmware tab is reset for the next operation.
 
-## Hummingbird 200 RaceSpec (development target)
-
-Select `HUMMINGBIRD_200RS` to use its matching FlightCode HEX. The native
-AT32F435 port has not yet been bench tested. The Configurator recognizes
-firmware CDC `2E3C:5740` and ROM DFU `2E3C:DF11`, reserves UART1 for the integrated
-CRSF/ELRS receiver, and offers UART5/UART7 for VTX. Flashing erases only occupied
-application pages and verifies their contents; the final 2 KiB settings page
-is excluded. AT32 DFU requires WebUSB and a suitable USB driver on Windows.
-Android supports normal CDC configuration; browser DFU remains a WebUSB feature.
-
 The top-right status bar shows **Current draw** beside voltage with two decimal places on
 boards reporting `BATTERY_CURRENT`. A missing sensor or disconnected board shows
 `— A`. This value is instantaneous amperage, not consumed capacity in mAh.
-
-On SEQURE H7 with diagnostic firmware, hover over current to see sensor voltage,
-sample count, sample age and conversion errors. Stale ADC samples show — A.
-
 
 ## Complete configuration backup
 
@@ -206,21 +133,4 @@ Before trying Betaflight: first update the Configurator and the same FlightCode 
 
 Validation: `node --test tests/*.test.js tests/*.cjs` includes full transactions for all current FlightCode targets and FlightCodePI, corrupt files, wrong board/schema, disconnects, timeouts and read-back comparison. Firmware protocol regression: compile `tests/settings_backup_test.c` with `-Isrc/protocol` in the FlightCode repository.
 
-Backup read resilience (2026-10-18): GET_SETTINGS_INFO and GET_SETTINGS_CHUNK may retry up to three times if a response times out. Disconnects and explicit firmware errors stop immediately. Restore begin/chunk/commit commands are never retried automatically. Index script URLs were changed so reloading picks up the updated client. On the real SEQURE H7, direct settings queries and a complete read-only browser backup succeeded; the reported restore-preflight timeout was not reproduced in that probe. A firmware capability-line truncation was observed on the device and fixed separately. No settings or firmware were written during the read-only diagnosis.
-
-## Pico 2 / Pico 2 W serial assignments (development firmware 1.6.4)
-
-The Pico reports logical ports **UART1** (GP0/GP1) and **UART2** (GP2/GP3).
-Both selectors offer both ports: assign the receiver and VTX to different ports.
-Defaults are receiver UART1 and VTX UART2. These logical names do not identify
-the RP2350 hardware UART instances; the receiver uses PIO. Older Pico firmware
-reporting PIO0/UART1 retains its fixed assignments in the Configurator.
-
-| Function | UART1 | UART2 |
-|---|---|---|
-| Receiver | GP0 RX, GP1 TX (bind only) | GP2 RX, GP3 TX (bind only) |
-| VTX / MSP DisplayPort | GP0 TX, GP1 RX | GP2 TX, GP3 RX |
-
-To swap assignments, disable VTX and apply, select and apply the receiver port,
-then select the other VTX port and re-enable/apply VTX. Save both settings.
-Rewire with power disconnected: TX/RX directions depend on the selected function.
+Backup read resilience (2026-10-18): GET_SETTINGS_INFO and GET_SETTINGS_CHUNK may retry up to three times if a response times out. Disconnects and explicit firmware errors stop immediately. Restore begin/chunk/commit commands are never retried automatically. Index script URLs were changed so reloading picks up the updated client.
