@@ -62,7 +62,7 @@ const $=s=>document.querySelector(s);
 
 axes.forEach(([key,label],axis)=>{
   const card=document.createElement("article");card.className="axis-card";
-  card.innerHTML=`<header><b>${label}</b><small>ASSE 0${axis+1}</small></header><div class="axis-fields">${
+  card.innerHTML=`<header><b>${label}</b></header><div class="axis-fields">${
     terms.map(term=>`<div class="pid-field"><label for="${key}${term}">${term}</label><input id="${key}${term}" data-pid type="number" min="0" max="${term==="D"?5000:2000}" step="1" value="" disabled></div>`).join("")
   }<div class="pid-field"><label for="${key}FF">FF</label><input id="${key}FF" data-feedforward type="number" min="0" max="1000" step="1" value="" disabled></div></div>`;
   $("#pidGrid").append(card);
