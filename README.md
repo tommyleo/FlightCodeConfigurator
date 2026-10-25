@@ -1,6 +1,6 @@
 # FlightCode Configurator
 
-Current development version: **1.6.4** (not released).
+Current release: **1.6.4**.
 
 ## FlightCode in action! 🚀
 
@@ -134,3 +134,5 @@ Before switching firmware: first update the Configurator and the same FlightCode
 Validation: `node --test tests/*.test.js tests/*.cjs` includes full transactions for all current FlightCode targets and FlightCodePI, corrupt files, wrong board/schema, disconnects, timeouts and read-back comparison. Firmware protocol regression: compile `tests/settings_backup_test.c` with `-Isrc/protocol` in the FlightCode repository.
 
 Backup read resilience (2026-10-18): GET_SETTINGS_INFO and GET_SETTINGS_CHUNK may retry up to three times if a response times out. Disconnects and explicit firmware errors stop immediately. Restore begin/chunk/commit commands are never retried automatically. Index script URLs were changed so reloading picks up the updated client.
+
+See [flight log format 2.0](docs/log-format-2.md) for the 1.6.4 logger, retained duration and analysis limits.

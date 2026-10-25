@@ -6,28 +6,24 @@ const FlightCodeBlackboxLogic=(()=>{
   }
 
   function decodeRecord(values,index,rate=200){
-    if(values.length<29)return null;
+    if(values.length!==43||!values.every(Number.isFinite))return null;
     const flags=values[11],mainLoopUs=values[12],gyroLoopUs=values[13];
     const pTerm=values.slice(17,20).map(v=>v/2),iTerm=values.slice(20,23).map(v=>v/2);
-    const legacyDTerm=values.slice(23,26).map(v=>v/2),ffTerm=values.slice(26,29).map(v=>v/2);
-    const extended=values.length>=43;
-    const dTerm=extended?values.slice(36,39).map(v=>v/100):legacyDTerm;
-    const pid=extended?values.slice(40,43).map(v=>v/2):pTerm.map((value,axis)=>{
-      const limit=axis===2?25:35,sum=value+iTerm[axis]+dTerm[axis]+ffTerm[axis];
-      return Number(Math.max(-limit,Math.min(limit,sum)).toFixed(2));
-    });
-    return {t:Number((index/rate).toFixed(5)),gyro:values.slice(0,3).map(v=>v/10),
+    const ffTerm=values.slice(26,29).map(v=>v/2);
+    const dTerm=values.slice(36,39).map(v=>v/100);
+    const pid=values.slice(40,43).map(v=>v/2);
+    return {t:null,gyro:values.slice(0,3).map(v=>v/10),
       setpoint:values.slice(3,6).map(v=>v/10),pid,
       motors:values.slice(6,10).map(v=>Number((v*100/255).toFixed(2))),
-      throttle:values[10]/2,mixerSaturated:(flags&1)!==0,stopReason:stopReasonName(flags),
+      throttle:values[10]/2,mixerSaturated:(flags&1)!==0,signalClipped:(flags&64)!==0,stopReason:stopReasonName(flags),
       mainLoopUs,mainLoopHz:mainLoopUs?Number((1000000/mainLoopUs).toFixed(2)):0,
       gyroLoopUs,gyroLoopHz:gyroLoopUs?Number((1000000/gyroLoopUs).toFixed(2)):0,
       batteryVoltage:values[14]/100,cellVoltage:values[15]/100,batteryCells:values[16],
       pTerm,iTerm,dTerm,ffTerm,
-      timestampUs:extended?values[29]:null,
-      gyroRaw:extended?values.slice(30,33).map(v=>v/10):values.slice(0,3).map(v=>v/10),
-      dTermUnfiltered:extended?values.slice(33,36).map(v=>v/100):legacyDTerm,
-      dTermFiltered:dTerm,droppedRecords:extended?values[39]:0};
+      timestampUs:values[29],
+      gyroRaw:values.slice(30,33).map(v=>v/10),
+      dTermUnfiltered:values.slice(33,36).map(v=>v/100),
+      dTermFiltered:dTerm,overwrittenRecords:values[39],logFormatVersion:"2.0"};
   }
 
   function decodeBinaryRecord(bytes,index,rate=200,batteryCells=0){
@@ -47,17 +43,33 @@ const FlightCodeBlackboxLogic=(()=>{
     const packedTiming=view.getUint8(56)|(view.getUint8(57)<<8)|(view.getUint8(58)<<16);
     const mainLoopUs=packedTiming&0xfff,gyroLoopUs=(packedTiming>>>12)&0xfff;
     const packedVersion=view.getUint8(59);
+    if(packedVersion!==0x20)return null;
     const logFormatVersion=`${packedVersion>>>4}.${packedVersion&0xf}`;
-    return {t:Number((index/rate).toFixed(5)),gyro,setpoint,
+    return {t:null,gyro,setpoint,
       pid:[view.getInt8(40),view.getInt8(41),view.getInt8(42)].map(v=>v/2),
       motors:[34,35,36,37].map(offset=>Number((view.getUint8(offset)*100/255).toFixed(2))),
-      throttle:view.getUint8(38)/2,mixerSaturated:(flags&1)!==0,stopReason:stopReasonName(flags),
+      throttle:view.getUint8(38)/2,mixerSaturated:(flags&1)!==0,signalClipped:(flags&64)!==0,stopReason:stopReasonName(flags),
       mainLoopUs,mainLoopHz:mainLoopUs?Number((1000000/mainLoopUs).toFixed(2)):0,
       gyroLoopUs,gyroLoopHz:gyroLoopUs?Number((1000000/gyroLoopUs).toFixed(2)):0,
       batteryVoltage:batteryCentivolts/100,
       cellVoltage:batteryCells?Math.floor(batteryCentivolts/batteryCells)/100:0,batteryCells,
       pTerm,iTerm,dTerm,ffTerm,timestampUs,gyroRaw,
       dTermUnfiltered,dTermFiltered:dTerm,droppedRecords:u16(54),logFormatVersion};
+  }
+
+  // Accumulate unsigned deltas so gaps and the uint32 microsecond rollover
+  // survive export. Never synthesize elapsed time from the sample index.
+  function applyTimestamps(records){
+    if(!records.length)return 0;
+    let previous=records[0].timestampUs,elapsed=0;
+    if(!Number.isInteger(previous))throw new Error("Missing log timestamp");
+    for(const record of records){
+      if(!Number.isInteger(record.timestampUs))throw new Error("Missing log timestamp");
+      elapsed+=((record.timestampUs>>>0)-(previous>>>0))>>>0;
+      record.t=Number((elapsed/1000000).toFixed(6));
+      previous=record.timestampUs;
+    }
+    return elapsed/1000000;
   }
 
   function addMissingSector(ranges,start,count,sector){
@@ -76,7 +88,7 @@ const FlightCodeBlackboxLogic=(()=>{
   }
 
   function buildMetadata(core,tuning,pids){
-    if(!core||!tuning||!pids)return null;
+    if(!core||core.version!==6||core.logFormatVersion!=="2.0"||!tuning||tuning.length<16||!pids||pids.length!==9)return null;
     const t=tuning;
     return {...core,pids,rates:{roll:t[0],pitch:t[1],yaw:t[2],expo:t[3]},
       feedforward:{roll:t[4],pitch:t[5],yaw:t[6]},tpa:{attenuation:t[7]*100,breakpoint:t[8]},
@@ -84,5 +96,5 @@ const FlightCodeBlackboxLogic=(()=>{
       motorIdlePercent:t[14]};
   }
 
-  return {stopReasonName,decodeRecord,decodeBinaryRecord,addMissingSector,missingSectorCount,buildMetadata};
+  return {stopReasonName,decodeRecord,decodeBinaryRecord,applyTimestamps,addMissingSector,missingSectorCount,buildMetadata};
 })();

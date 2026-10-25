@@ -1,5 +1,5 @@
 const axes=[["roll","ROLL"],["pitch","PITCH"],["yaw","YAW"]],terms=["P","I","D"];
-const CONFIGURATOR_VERSION="1.6.4",MINIMUM_FIRMWARE_VERSION="1.4.0";
+const CONFIGURATOR_VERSION="1.6.4",MINIMUM_FIRMWARE_VERSION="1.6.4";
 let receiverConfig={protocol:"SBUS",port:"UART1",order:"TAER1234",modes:[{fn:"ARM",channel:6,min:1950,max:2100},{fn:"BEEP",channel:5,min:1950,max:2100}]};
 let vtxConfig={protocol:"OFF",port:"UART3",table:"EU",band:"R",channel:1,power:25};
 const vtxTables={US:{A:[5865,5845,5825,5805,5785,5765,5745,5725],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[5705,5685,5665,0,5885,5905,0,0],F:[5740,5760,5780,5800,5820,5840,5860,5880],R:[5658,5695,5732,5769,5806,5843,5880,5917]},EU:{A:[5865,5845,5825,5805,5785,5765,5745,0],B:[5733,5752,5771,5790,5809,5828,5847,5866],E:[0,0,0,0,0,0,0,0],F:[5740,5760,5780,5800,5820,5840,5860,0],R:[0,0,5732,5769,5806,5843,0,0]}};
@@ -308,7 +308,8 @@ function receiveBlackboxBinary(transfer,bytes){
   const cells=flight.metadata?.batteryCells||0;
   for(let i=0;i<transfer.count;i++){
     const record=FlightCodeBlackboxLogic.decodeBinaryRecord(bytes.subarray(i*transfer.recordSize,(i+1)*transfer.recordSize),transfer.offset+i,rate,cells);
-    if(record)blackbox.records.push(record);
+    if(!record){failBlackboxDownload("Invalid Blackbox record or unsupported format; record a new flight with 1.6.4.");return}
+    blackbox.records.push(record);
   }
 }
 
@@ -348,15 +349,15 @@ function finishBlackboxDownload(incomplete=null){
   const metadata=flight.metadata;
   const skippedSectors=FlightCodeBlackboxLogic.missingSectorCount(blackbox.skippedRanges);
   const partial=Boolean(incomplete)||skippedSectors>0;
-  const timestamped=blackbox.records.length&&Number.isFinite(blackbox.records[0].timestampUs);
-  if(timestamped){const origin=blackbox.records[0].timestampUs>>>0;blackbox.records.forEach(record=>{record.t=Number((((record.timestampUs>>>0)-origin>>>0)/1000000).toFixed(6))})}
-  const file={format:"FlightCode-Flight-Log",version:"1.0",source:"persistent Blackbox",flightId:flight.id,
+  FlightCodeBlackboxLogic.applyTimestamps(blackbox.records);
+  const file={format:"FlightCode-Flight-Log",version:"2.0",firmwareVersion:state.firmwareVersion,configuratorVersion:CONFIGURATOR_VERSION,source:"persistent Blackbox",flightId:flight.id,
     created:new Date().toISOString(),board:state.board||"UNKNOWN",sampleRateHz:metadata?.logRateHz||flight.rate||200,
     alignment:metadata?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:metadata?.motorDirection||$("#motorDirection").value,
     rates:metadata?.rates||getRates(),feedforward:metadata?.feedforward||getFeedforward(),
     pids:metadata?.pids||getPids(),tpa:metadata?.tpa||getTpa(),
     filters:metadata?.filters||(hasCapability("FILTERS")?getFilters():undefined),
+    sampling:{timing:"measured",antiAliasFilter:false,nyquistHz:(metadata?.logRateHz||flight.rate)/2},
     flightConfiguration:metadata||null,stopReason:stopReasonName(flight.stopFlag),
     incomplete:partial,downloadedSamples:blackbox.records.length,
     expectedSamples:flight.records,
@@ -388,7 +389,7 @@ function updateBlackboxDownloadProgress(flightId,next,total){
   if(next<total&&now-blackbox.lastProgressUiAt<100)return;
   blackbox.lastProgressUiAt=now;
   const progress=Math.min(next,total)/Math.max(total,1),elapsed=Math.max((now-blackbox.downloadStartedAt)/1000,.001);
-  const recordsPerSecond=next/elapsed,bytesPerSecond=blackbox.records.length*48/elapsed,remaining=recordsPerSecond>0?(total-next)/recordsPerSecond:0;
+  const recordsPerSecond=next/elapsed,bytesPerSecond=blackbox.records.length*60/elapsed,remaining=recordsPerSecond>0?(total-next)/recordsPerSecond:0;
   $("#blackboxDownloadProgress").style.width=`${progress*100}%`;
   $("#blackboxDownloadState").textContent=`Downloading flight #${flightId} · ${(progress*100).toFixed(1)}% · ${formatBytes(bytesPerSecond)}/s${remaining>0?` · ${Math.ceil(remaining)} s remaining`:""}`;
 }
@@ -979,16 +980,23 @@ function startFlightLogDownload(){
 }
 function finishFlightLogDownload(){
   flightLog.downloading=false;
+  if(!flightLog.metadata||flightLog.records.length!==flightLog.count){
+    updateFlightLogUi();showError("Incomplete or unsupported flight log. Use firmware and Configurator 1.6.4 and record a new flight.");return;
+  }
+  FlightCodeBlackboxLogic.applyTimestamps(flightLog.records);
   const last=flightLog.records.at(-1);
   const m=flightLog.metadata;
-  const file={format:"FlightCode-Flight-Log",version:"1.0",created:new Date().toISOString(),
+  const file={format:"FlightCode-Flight-Log",version:"2.0",firmwareVersion:state.firmwareVersion,configuratorVersion:CONFIGURATOR_VERSION,created:new Date().toISOString(),
     board:state.board||"UNKNOWN",sampleRateHz:m?.logRateHz||flightLog.rate,
     alignment:m?.alignment||["boardRoll","boardPitch","boardYaw"].map(id=>Number($(`#${id}`).value)),
     motorDirection:m?.motorDirection||$("#motorDirection").value,rates:m?.rates||getRates(),
     feedforward:m?.feedforward||getFeedforward(),
     pids:m?.pids||getPids(),tpa:m?.tpa||getTpa(),stopReason:last?.stopReason||"UNKNOWN",
     flightConfiguration:m,
-    receiverDiagnostics:flightLog.receiverDiagnostics,
+    source:"internal circular logger",
+    sampling:{timing:"measured",antiAliasFilter:false,nyquistHz:flightLog.rate/2},
+    retainedDurationSeconds:last?.t||0,overwrittenRecords:last?.overwrittenRecords||0,
+    receiverDiagnosticsAtDownload:flightLog.receiverDiagnostics,
     blackboxDiagnostics:flightLog.blackboxDiagnostics,
     samples:flightLog.records};
   if(m?.filters)file.filters=m.filters;else if(hasCapability("FILTERS"))file.filters=getFilters();
@@ -1168,7 +1176,7 @@ function line(value){
   }
   if(p[1]==="BLACKBOX_LOG"&&blackbox.downloading&&p.length>=33){
     const flightId=Number(p[2]),index=Number(p[3]),values=p.slice(4).map(Number);
-    const record=decodeLogRecord(values,index,blackbox.flight?.metadata?.logRateHz||blackbox.flight?.rate||200);if(record&&blackbox.flight?.id===flightId)blackbox.records.push(record);return
+    const record=decodeLogRecord(values,index,blackbox.flight?.metadata?.logRateHz||blackbox.flight?.rate||200);if(record&&blackbox.flight?.id===flightId){record.droppedRecords=record.overwrittenRecords;delete record.overwrittenRecords;blackbox.records.push(record)}return
   }
   if(p[1]==="BLACKBOX_METADATA_CORE"&&blackbox.downloading){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
@@ -1184,9 +1192,10 @@ function line(value){
     const f=blackbox.flight;if(!f||f.id!==Number(p[2]))return;
     const c=f.metadataParts.core,t=f.metadataParts.tuning,ps=f.metadataParts.pids;
     f.metadata=FlightCodeBlackboxLogic.buildMetadata(c,t,ps);
+    if(!f.metadata){blackbox.downloading=false;updateBlackboxControls();showError("Unsupported Blackbox format. Record a new flight with firmware 1.6.4.");return}
     requestBlackboxChunk(f.id,0);return
   }
-  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){requestBlackboxChunk(blackbox.flight.id,0);return}
+  if(p[1]==="BLACKBOX_METADATA_UNAVAILABLE"&&blackbox.downloading){blackbox.downloading=false;updateBlackboxControls();showError("Blackbox metadata unavailable. Record a new flight with firmware 1.6.4.");return}
   if(p[1]==="BLACKBOX_BINARY"&&blackbox.downloading&&p.length>=6){
     const flightId=Number(p[2]),offset=Number(p[3]),count=Number(p[4]),recordSize=Number(p[5]);
     if(blackbox.flight?.id===flightId&&count>=0&&count<=40&&recordSize===60)state.binaryTransfer={flightId,offset,count,recordSize,bytes:count*recordSize};
@@ -1262,9 +1271,10 @@ function line(value){
   if(p[1]==="FLIGHT_LOG_METADATA_END"&&flightLog.downloading){
     const c=flightLog.metadataParts.core,t=flightLog.metadataParts.tuning,ps=flightLog.metadataParts.pids;
     flightLog.metadata=FlightCodeBlackboxLogic.buildMetadata(c,t,ps);
+    if(!flightLog.metadata){flightLog.downloading=false;updateFlightLogUi();showError("Unsupported log format. Record a new flight with firmware 1.6.4.");return}
     send("GET_FLIGHT_LOG_CHUNK 0 8",false);return
   }
-  if(p[1]==="FLIGHT_LOG_METADATA_UNAVAILABLE"&&flightLog.downloading){send("GET_FLIGHT_LOG_CHUNK 0 8",false);return}
+  if(p[1]==="FLIGHT_LOG_METADATA_UNAVAILABLE"&&flightLog.downloading){flightLog.downloading=false;updateFlightLogUi();showError("Flight metadata unavailable. Record a new flight with firmware 1.6.4.");return}
   if(p[1]==="BLACKBOX_DIAGNOSTICS"&&p.length>=16){
     const reject=Number(p[4])||0;
     flightLog.blackboxDiagnostics={
